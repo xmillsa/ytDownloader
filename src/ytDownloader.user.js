@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        Andys Youtube Downloader
+// @name        Xmillsa's Youtube Downloader
 // @version     0.0.5
 // @namespace   https://andys-net.co.uk/
 // @author      Andy Mills
@@ -37,7 +37,7 @@
         formats: [],
         adaptive: [],
         container: null,
-            
+
         // Gets the current videos ID.
         getVideoID: function(){
             return new Promise(function(resolve, reject){
@@ -115,7 +115,7 @@
             // Check it doesn't already exist.
             if (document.getElementById('andysContainer') === null){
                 const div = document.createElement('div'),
-                      target = document.getElementById('info');
+                      target = document.getElementById('player');
 
                 // Check our target exists.
                 if (target !== null){
@@ -124,7 +124,7 @@
                     
                     div.innerHTML = '<div id="andyLeft"></div><div id="andyRight"></div>';
                     
-                    target.parentNode.insertBefore(div, target.nextElementSibling);
+                    target.parentNode.insertBefore(div, target.parentNode.querySelector('#meta'));
                     this.container = div;
                 }
             }
