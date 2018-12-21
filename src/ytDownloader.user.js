@@ -2,7 +2,7 @@
 // @name        Xmillsa's Youtube Downloader
 // @version     0.0.5
 // @namespace   https://andys-net.co.uk/
-// @author      Andy Mills
+// @author      Xmillsa
 // @grant       none
 // @match       https://www.youtube.com/*
 // @homepageURL https://andys-net.co.uk/
@@ -13,24 +13,6 @@
 
     const ytDownloader = {};
     
-    /*
-        Working on this.
-    */
-    Object.defineProperty(ytDownloader, 'fullName', {
-        get: function() {
-            return firstName + ' ' + lastName;
-        },
-        set: function(name) {
-            var words = name.split(' ');
-            this.firstName = words[0] || '';
-            this.lastName = words[1] || '';
-        }
-    });
-    
-    
-    /*
-        The following should all be working.
-    */
     let ytd = {
         videoID: '',
         videoObj: {},
@@ -64,8 +46,6 @@
                     this.videoObj = JSON.parse(decodeURIComponent(String(/player_response=[^&]*/i.exec(r)).replace('player_response=', '')));
                     this.formats = this.videoObj.streamingData.formats;
                     this.adaptive = this.videoObj.streamingData.adaptiveFormats;
-                    console.log(this.formats);
-                    console.log(this.adaptive);
                     // Carry on.
                     resolve();
                 })
@@ -85,7 +65,6 @@
                 return;
             }
             
-            console.log('about to make');
             this.formats.sort((a, b) => {
                 return parseInt(b.contentLength) - parseInt(a.contentLength);
             });
@@ -191,8 +170,6 @@
             
             // Check we're on a watch?v= page.
             if (/watch\?v/.test(window.location.href)){
-                console.log('Start');
-                
                 this.getVideoID()
                 .then(() => {
                     // We have an ID, lets fetch it's info!
@@ -245,13 +222,7 @@
         width:100%;
     }
     #andysContainer a{
-        color: #ac0;
-    }
-    #andyLeft{
-        
-    }
-    #andyRight{
-        
+        color: #a92;
     }`;
     
     const style = document.createElement('style');
