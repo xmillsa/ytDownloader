@@ -5,7 +5,7 @@ Currently in development, may occasionally work and then maybe not work.
 
 ## Installation
 Simply install one of the following: greasemonkey, tampermonkey, violentmonkey.  
-Click this link: [ytDownloader.user.js]('https://github.com/xmillsa/ytDownloader/raw/master/src/ytDownloader.user.js')  
+Click this link: [ytDownloader.user.js](https://github.com/xmillsa/ytDownloader/raw/master/src/ytDownloader.user.js)  
 Your chosen addon should then provide you with an install option, once installed head over to Youtube and you'll find some links underneath videos.  
 
 ### Limitations
