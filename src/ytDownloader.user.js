@@ -4,7 +4,7 @@
 // @namespace   https://andys-net.co.uk/
 // @author      Andy Mills
 // @grant       none
-// @match       https://www.youtube.com/watch?v=*
+// @match       https://www.youtube.com/*
 // @homepageURL https://andys-net.co.uk/
 // ==/UserScript==
 
@@ -13,6 +13,9 @@
 
     const ytDownloader = {};
     
+    /*
+        Working on this.
+    */
     Object.defineProperty(ytDownloader, 'fullName', {
         get: function() {
             return firstName + ' ' + lastName;
@@ -25,6 +28,9 @@
     });
     
     
+    /*
+        The following should all be working.
+    */
     let ytd = {
         videoID: '',
         videoObj: {},
@@ -76,8 +82,10 @@
             if (this.container === null){
                 console.log('Container Missing, Creating...');
                 this.createContainer();
+                return;
             }
             
+            console.log('about to make');
             this.formats.sort((a, b) => {
                 return parseInt(b.contentLength) - parseInt(a.contentLength);
             });
@@ -120,6 +128,7 @@
                     this.container = div;
                 }
             }
+            this.makeButtons();
         },
 
         /*
@@ -180,26 +189,31 @@
             // Reset.
             this.reset();
             
-            this.getVideoID()
-            .then(() => {
-                // We have an ID, lets fetch it's info!
-                console.log('Found the video!');
-                this.getVideoDetails()
+            // Check we're on a watch?v= page.
+            if (/watch\?v/.test(window.location.href)){
+                console.log('Start');
+                
+                this.getVideoID()
                 .then(() => {
-                    console.log('Make buttons.');
-                    this.makeButtons();
+                    // We have an ID, lets fetch it's info!
+                    console.log('Found the video!');
+                    this.getVideoDetails()
+                    .then(() => {
+                        console.log('Make buttons.');
+                        this.makeButtons();
+                    })
+                    .catch(e => {
+                        console.log(e);
+                        // Try again?
+                        setTimeout(this.process.bind(this), 500);
+                    });
                 })
                 .catch(e => {
-                    console.log(e);
+                    console.error(e);
                     // Try again?
                     setTimeout(this.process.bind(this), 500);
                 });
-            })
-            .catch(e => {
-                console.error(e);
-                // Try again?
-                setTimeout(this.process.bind(this), 500);
-            });
+            }
         }
 
     };
@@ -224,6 +238,7 @@
     
     const css = `
     #andysContainer{
+        margin-top:26px;
         font-size:1.3em;
         display:flex;
         justify-content:space-evenly;
