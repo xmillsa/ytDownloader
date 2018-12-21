@@ -1,7 +1,9 @@
 # ytDownloader
 A userscript for downloading Youtube Videos.  
+This script doesn't require any external scripts or libraries, the code you see if the code you get.
 
-Currently in development, may occasionally work and then maybe not work.  
+It's very lightweight, pretty much working, just a bit ugly at the moment.  
+It is currently in development so it may occasionally work and then maybe not...
 
 ## Installation
 Simply install one of the following: greasemonkey, tampermonkey, violentmonkey.  
