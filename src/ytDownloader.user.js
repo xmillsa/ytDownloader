@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.0.5
+// @version     0.0.6
 // @namespace   https://andys-net.co.uk/
-// @author      Andy Mills
+// @author      Xmillsa
 // @grant       none
 // @match       https://www.youtube.com/*
 // @homepageURL https://andys-net.co.uk/
@@ -10,27 +10,26 @@
 
 (function(){
     "use strict";
-
-    const ytDownloader = {};
     
-    /*
-        Working on this.
-    */
-    Object.defineProperty(ytDownloader, 'fullName', {
-        get: function() {
-            return firstName + ' ' + lastName;
-        },
-        set: function(name) {
-            var words = name.split(' ');
-            this.firstName = words[0] || '';
-            this.lastName = words[1] || '';
-        }
-    });
+    async function getVideoDetails(){
+        let 
+        return new Promise( resolve => {
+            setTimeout(() => {
+                const id = String( /(?![\?v=]).*?(?=&|$)/i.exec( window.location.search ));
+                if ( id[ 0 ] !== '' ){
+                    resolve( id );
+                }else{
+                    throw new Error( 'Link not valid' );
+                }
+            }, 1000);
+        });
+    }
     
+    // Is there a video?
+    // Get video data.
+    // Use data to make links.
+    // Display links.
     
-    /*
-        The following should all be working.
-    */
     let ytd = {
         videoID: '',
         videoObj: {},
@@ -64,8 +63,6 @@
                     this.videoObj = JSON.parse(decodeURIComponent(String(/player_response=[^&]*/i.exec(r)).replace('player_response=', '')));
                     this.formats = this.videoObj.streamingData.formats;
                     this.adaptive = this.videoObj.streamingData.adaptiveFormats;
-                    console.log(this.formats);
-                    console.log(this.adaptive);
                     // Carry on.
                     resolve();
                 })
@@ -85,7 +82,6 @@
                 return;
             }
             
-            console.log('about to make');
             this.formats.sort((a, b) => {
                 return parseInt(b.contentLength) - parseInt(a.contentLength);
             });
@@ -191,8 +187,6 @@
             
             // Check we're on a watch?v= page.
             if (/watch\?v/.test(window.location.href)){
-                console.log('Start');
-                
                 this.getVideoID()
                 .then(() => {
                     // We have an ID, lets fetch it's info!
@@ -224,7 +218,7 @@
     let oldURL = '',
         newURL = window.location.href;
 
-    setInterval(loopyLoops, 100);
+    //setInterval(loopyLoops, 100);
     // Check for changes.
     function loopyLoops(){
         newURL = window.location.href;
@@ -245,13 +239,7 @@
         width:100%;
     }
     #andysContainer a{
-        color: #ac0;
-    }
-    #andyLeft{
-        
-    }
-    #andyRight{
-        
+        color: #a92;
     }`;
     
     const style = document.createElement('style');
