@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.0.5
+// @version     0.0.6
 // @namespace   https://andys-net.co.uk/
 // @author      Xmillsa
 // @grant       none
@@ -94,10 +94,11 @@
             // Check it doesn't already exist.
             if (document.getElementById('andysContainer') === null){
                 const div = document.createElement('div'),
-                      target = document.getElementById('player');
+                      target = document.querySelector('#primary #player');
 
                 // Check our target exists.
                 if (target !== null){
+                    const insertTarget = target.querySelector
                     div.className = 'style-scope ytd-watch-flexy';
                     div.id = 'andysContainer';
                     
