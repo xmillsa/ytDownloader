@@ -41,8 +41,6 @@
         Fetch the videos details and await its arrival,
         Turn that data into something usable,
         Create the actual links and visile data.
-        
-        That's it.
     */
     async function main(){
         try{
@@ -151,7 +149,7 @@
         This simply finds the requested target, used as a promise to allow waiting.
         Probably overkill but it just felt right making it this way.
         Will simply wait... forever, until the target is found.
-        This hasn't been tested for forced errors, so oould break, has worked everytime in testing...
+        This hasn't been tested for forced errors, so oould break, has worked every time in testing, so far...
     */
     function findTheTarget( target ){
         return new Promise( resolve => {
@@ -185,7 +183,7 @@
               adaptiveAudio = [];
 
         let i = 0;
-        // Store the Audio only and Video only streams seperately.
+        // Loops through the adaptive array and stores the audio and video links seperately.
         for( ; i < adaptive.length; i++ ){
             if ( adaptive[ i ].mimeType.split( ';' )[ 0 ].split( '/' )[ 0 ] === 'audio' ){
                 // Send to Audio only array.
@@ -195,24 +193,26 @@
                 adaptiveVideo.push( adaptive[ i ] );
             }
         }
-        // Sort by content length (filesize)
+        // Sorts the "adaptiveAudio" array by content length (filesize)
         adaptiveAudio.sort((a, b) => {
             return parseInt(b.contentLength) - parseInt(a.contentLength);
         });
-        // Sort by content length (filesize)
+        // Sorts the "adaptiveVideo" array by content length (filesize)
         adaptiveVideo.sort((a, b) => {
             return parseInt(b.contentLength) - parseInt(a.contentLength);
         });
+        // Sorts the "formats" array by content length (filesize)
         formats.sort((a, b) => {
             return parseInt(b.contentLength) - parseInt(a.contentLength);
         });
-        // adaptive.sort((a, b) => {
-            // return parseInt(b.contentLength) - parseInt(a.contentLength);
-        // });
 
-        let row,
-            target = document.querySelector('#yt-container #combined');
+        /*
+            Loop through the previously made, now sorted arrays and display the required infomation.
+        */
+        let row, target, i;
+
         i = 0;
+        target = document.querySelector('#yt-container #combined');
         for( ; i < formats.length; i++ ){
             row = displayInfo( formats[ i ] );
             target.appendChild( row );
@@ -224,14 +224,13 @@
             row = displayInfo( adaptiveAudio[ i ] );
             target.appendChild( row );
         }
+
         i = 0;
         target = document.querySelector('#yt-container #seperate-video');
         for( ; i < adaptiveVideo.length; i++ ){
             row = displayInfo( adaptiveVideo[ i ] );
             target.appendChild( row );
         }
-        
-        // Sort audio.
     }
 
     /*
@@ -262,7 +261,8 @@
                 break;
             }
         }
-        
+
+        // Convert to Kbs for easier reading.
         if (qual === undefined){
             qual = String(Number(data[ 'averageBitrate' ] / 1024 ).toFixed(0)) +' Kbs';
         }
