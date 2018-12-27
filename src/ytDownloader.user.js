@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.1.1
+// @version     0.1.2
 // @namespace   https://andys-net.co.uk/
 // @author      Xmillsa
 // @grant       none
@@ -56,10 +56,9 @@
                 // Get the current video ID from the URL.
                 const videoID  = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
                       response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } ),
-                      data     = await response.text();
-
-                // Parse the data so we can use it.
-                const json     = parseData( data );
+                      data     = await response.text(),
+                      // Parse the data so we can use it.
+                      json     = parseData( data );
 
                 // Create the links.
                 createLinks( json );
@@ -67,9 +66,12 @@
                 console.log( 'No video here.' );
             }
         }
-        catch(e){
-            // Just errors, errors everywhere!
-            console.log(e);
+        catch( e ){
+            /*
+                Errors, errors everywhere!
+                Not really but something went wrong.
+            */
+            console.log( e );
         }
     }
 
@@ -94,7 +96,6 @@
     async function createContainer(){
         // Check it's not already been created.
         if ( document.getElementById( 'yt-container' ) === null ){
-            console.log( 'Create Container' );
             const target  = await findTheTarget( '#primary #player' ),
                   div     = document.createElement( 'div' );
 
@@ -105,7 +106,7 @@
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
-                if (div.classList.contains('open') === false){
+                if (div.classList.contains( 'open' ) === false){
                     let currentHeight = div.clientHeight;
                     // Work out required height.
                     // Temporarily disable transitions.
@@ -123,9 +124,8 @@
                     div.style.height = setHeight +'px';
                 } else {
                     // Use CSS styling.
-                    div.removeAttribute('style');
+                    div.removeAttribute( 'style' );
                 }
-                // div.removeAttribute('style');
                 div.classList.toggle( 'open' );
             });
 
@@ -182,7 +182,7 @@
               // Store Audio only.
               adaptiveAudio = [];
 
-        let i = 0;
+        let row, target, i = 0;
         // Loops through the adaptive array and stores the audio and video links seperately.
         for( ; i < adaptive.length; i++ ){
             if ( adaptive[ i ].mimeType.split( ';' )[ 0 ].split( '/' )[ 0 ] === 'audio' ){
@@ -194,39 +194,37 @@
             }
         }
         // Sorts the "adaptiveAudio" array by content length (filesize)
-        adaptiveAudio.sort((a, b) => {
-            return parseInt(b.contentLength) - parseInt(a.contentLength);
+        adaptiveAudio.sort(( a, b ) => {
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
         // Sorts the "adaptiveVideo" array by content length (filesize)
-        adaptiveVideo.sort((a, b) => {
-            return parseInt(b.contentLength) - parseInt(a.contentLength);
+        adaptiveVideo.sort(( a, b ) => {
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
         // Sorts the "formats" array by content length (filesize)
-        formats.sort((a, b) => {
-            return parseInt(b.contentLength) - parseInt(a.contentLength);
+        formats.sort(( a, b ) => {
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
 
         /*
             Loop through the previously made, now sorted arrays and display the required infomation.
         */
-        let row, target, i;
-
         i = 0;
-        target = document.querySelector('#yt-container #combined');
+        target = document.querySelector( '#yt-container #combined' );
         for( ; i < formats.length; i++ ){
             row = displayInfo( formats[ i ] );
             target.appendChild( row );
         }
 
         i = 0;
-        target = document.querySelector('#yt-container #seperate-audio');
+        target = document.querySelector( '#yt-container #seperate-audio' );
         for( ; i < adaptiveAudio.length; i++ ){
             row = displayInfo( adaptiveAudio[ i ] );
             target.appendChild( row );
         }
 
         i = 0;
-        target = document.querySelector('#yt-container #seperate-video');
+        target = document.querySelector( '#yt-container #seperate-video' );
         for( ; i < adaptiveVideo.length; i++ ){
             row = displayInfo( adaptiveVideo[ i ] );
             target.appendChild( row );
@@ -242,9 +240,9 @@
     */
     function displayInfo( data ){
         let row       = document.createElement( 'div' ),
-            qual      = data['qualityLabel'],
+            qual      = data[ 'qualityLabel' ],
             mime      = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' ),
-            size      = Number(data['contentLength'] / 1024 / 1024).toFixed(2),
+            size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2),
             type      = mime[ 1 ];
 
         if ( mime[ 0 ] === 'video' ){
@@ -285,7 +283,7 @@
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;margin-top:.4em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -295,7 +293,7 @@
                   #yt-container > button:hover,#yt-container.open > button{box-shadow:0 2px 0 0 var(--yt-spec-10-percent-layer)}
                   #yt-container > #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
                   #yt-container > #yt-links div{width:100%}
-                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin-top:.4em}
+                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin-top:.4em;border-top:1px solid var(--yt-spec-10-percent-layer)}
                   #yt-container a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
                   #yt-container h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
                   #yt-container .row{display:flex;justify-content:space-evenly}
