@@ -54,9 +54,6 @@
 
                 // Create our container/button.
                 createContainer();
-                
-                // Do some magic!
-                request2Blobs();
 
                 // Get the current video ID from the URL.
                 const videoID  = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
@@ -69,6 +66,9 @@
                       console.log(json);
                 // Create the links.
                 createLinks( json );
+                
+                // Do some magic!
+                //requestBlobs( json );
             } else {
                 // Must be a page with no video.
             }
@@ -85,32 +85,39 @@
     // DEBUG
     /*
         Experimental, but works?!?! Awesome... (currently limited to the video of that URL below)
+        TODO:
+        get url, we already know from button links.
+        get contentLength
+        divide contentLength by number of requests, this is how many requests we will make.
+        make multiple promise requests.
+        await all promises in 1 go, return the file for download!        
     */
-    async function request2Blobs(){
+    async function requestBlobs( data ){
         try{
-        const url = 'https://r2---sn-8pgbpohxqp5-ac5l.googlevideo.com/videoplayback?lmt=1544814931381283&sparams=clen%2Cdur%2Cei%2Cgir%2Cid%2Cinitcwndbps%2Cip%2Cipbits%2Citag%2Clmt%2Cmime%2Cmm%2Cmn%2Cms%2Cmv%2Cpl%2Cratebypass%2Crequiressl%2Csource%2Cexpire&ipbits=0&initcwndbps=2085000&source=youtube&ei=Rn4lXPfZOZnO1gb9jISIBg&requiressl=yes&gir=yes&mn=sn-8pgbpohxqp5-ac5l%2Csn-aigl6n76&ip=86.22.149.11&mm=31%2C29&expire=1545982631&pl=22&itag=18&mv=m&mt=1545960958&ms=au%2Crdu&signature=B3F7B094A7E4491418912F0A2BCF87AE2F344874.41242B5B8BF7DFF7235927387B11FC8A57D035E4&id=o-AJiCTVd2BEtm5_HQijeXYGn3epzTUZFkaHhjSouMXhWU&mime=video%2Fmp4&key=yt6&txp=5531432&c=WEB&ratebypass=yes&clen=9370557&dur=173.197&fvip=4';
-        const blob1 = new Promise( async (resolv) => {
-                  let response = await fetch( `${url}&range=0-1000000`, { method: 'GET' } ),
+        const url = data[ 'url' ],
+              contentLength = data[ 'contentLength' ],
+              chunks = 4,
+              blobSize = Math.ceil( contentLength / chunks );
+
+        //const url = 'https://r2---sn-8pgbpohxqp5-ac5l.googlevideo.com/videoplayback?lmt=1544814931381283&sparams=clen%2Cdur%2Cei%2Cgir%2Cid%2Cinitcwndbps%2Cip%2Cipbits%2Citag%2Clmt%2Cmime%2Cmm%2Cmn%2Cms%2Cmv%2Cpl%2Cratebypass%2Crequiressl%2Csource%2Cexpire&ipbits=0&initcwndbps=2085000&source=youtube&ei=Rn4lXPfZOZnO1gb9jISIBg&requiressl=yes&gir=yes&mn=sn-8pgbpohxqp5-ac5l%2Csn-aigl6n76&ip=86.22.149.11&mm=31%2C29&expire=1545982631&pl=22&itag=18&mv=m&mt=1545960958&ms=au%2Crdu&signature=B3F7B094A7E4491418912F0A2BCF87AE2F344874.41242B5B8BF7DFF7235927387B11FC8A57D035E4&id=o-AJiCTVd2BEtm5_HQijeXYGn3epzTUZFkaHhjSouMXhWU&mime=video%2Fmp4&key=yt6&txp=5531432&c=WEB&ratebypass=yes&clen=9370557&dur=173.197&fvip=4';
+        const blobArray = [];
+        
+        let i = 0,
+            start,
+            end;
+
+        for( ; i < chunks; i++ ){
+            start = (blobSize + 1) * i;
+            end = start + blobSize;
+            console.log(start, end);
+            blobArray.push( new Promise( async (resolv) => {
+                  let response = await fetch( `${url}&range=${start}-${end}`, { method: 'GET' } ),
                       data     = await response.blob();
                   resolv( data );
-              }),
-              blob2 = new Promise( async (resolv) => {
-                  let response = await fetch( `${url}&range=1000001-2000000`, { method: 'GET' } ),
-                      data     = await response.blob();
-                  resolv( data );
-              }),
-              blob3 = new Promise( async (resolv) => {
-                  let response = await fetch( `${url}&range=2000001-3000000`, { method: 'GET' } ),
-                      data     = await response.blob();
-                  resolv( data );
-              }),
-              blob4 = new Promise( async (resolv) => {
-                  let response = await fetch( `${url}&range=3000001-4000000`, { method: 'GET' } ),
-                      data     = await response.blob();
-                  resolv( data );
-              });
-        console.log('Promise All');
-        Promise.all( [ blob1, blob2, blob3, blob4 ]).then( function (values) {
+              }) );
+        }
+
+        Promise.all( blobArray ).then( function (values) {
             console.log(values);
             
             let newBlob = new Blob( values, {type: "octet/stream"} ),
@@ -237,7 +244,7 @@
         then simply loops through the arrays, sedns each entry to the "displayInfo" function,
         then adds the returned element to the page.
     */
-    function createLinks( json ){
+    async function createLinks( json ){
               // Store the combined video formats.
         const formats  = json.streamingData.formats,
               // Store the seperate video & audio formats.
@@ -275,7 +282,7 @@
             Loop through the previously made, now sorted arrays and display the required infomation.
         */
         i = 0;
-        target = document.querySelector( '#yt-container #combined' );
+        target = await findTheTarget( '#yt-container #combined' );
         for( ; i < formats.length; i++ ){
             if ( row = displayInfo( formats[ i ] ) ){
                 target.appendChild( row );
@@ -283,7 +290,7 @@
         }
 
         i = 0;
-        target = document.querySelector( '#yt-container #seperate-audio' );
+        target = await findTheTarget( '#yt-container #seperate-audio' );
         for( ; i < adaptiveAudio.length; i++ ){
             if ( row = displayInfo( adaptiveAudio[ i ] ) ){
                 target.appendChild( row );
@@ -291,7 +298,7 @@
         }
 
         i = 0;
-        target = document.querySelector( '#yt-container #seperate-video' );
+        target = await findTheTarget( '#yt-container #seperate-video' );
         for( ; i < adaptiveVideo.length; i++ ){
             if ( row = displayInfo( adaptiveVideo[ i ] ) ){
                 target.appendChild( row );
@@ -315,8 +322,8 @@
 
         /*
             Check if the size is a number!
-            If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist.
-            For now, just don't display the links, may need to check incase this is just a temporary bug.
+            If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist, even though Youtube seems to think it does.
+            For now, just don't display the links, may need to re-check this in the future incase this is just a temporary bug.
         */
         if ( isNaN( size ) ){
             return false;
@@ -348,6 +355,28 @@
                          <div class="left">
                              <a href='${data[ 'url' ]}' download target="_blank" title='${data[ 'mimeType' ].split( ';' )[0].split( '/' )[1]}'>Download ${type}</a>
                          </div>`;
+        
+        // DEBUG
+        let a = document.createElement('a'),
+        div = document.createElement('div');
+        
+        a.href = data['url'];
+        a.innerText = 'test';
+        a.dataset.contentLength = data[ 'contentLength' ];
+        a.addEventListener('click', ( e ) => {
+            e.preventDefault();
+            
+            const theData = [];
+            
+            theData[ 'url' ] = e.target.href;
+            theData[ 'contentLength' ] = e.target.dataset.contentLength;
+            
+            requestBlobs( theData );
+        });
+        
+        div.appendChild(a);
+        row.appendChild(div);
+        
         return row;
     }
 
