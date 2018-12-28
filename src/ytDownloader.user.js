@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.1.2
+// @version     0.1.3
 // @namespace   https://andys-net.co.uk/
+// @homepageURL https://andys-net.co.uk/
+// @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
 // @author      Xmillsa
+// @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
 // @grant       none
 // @match       https://www.youtube.com/*
-// @homepageURL https://andys-net.co.uk/
 // ==/UserScript==
 
 (function (){
@@ -63,7 +65,7 @@
                 // Create the links.
                 createLinks( json );
             } else {
-                console.log( 'No video here.' );
+                // Must be a page with no video.
             }
         }
         catch( e ){
@@ -212,22 +214,25 @@
         i = 0;
         target = document.querySelector( '#yt-container #combined' );
         for( ; i < formats.length; i++ ){
-            row = displayInfo( formats[ i ] );
-            target.appendChild( row );
+            if ( row = displayInfo( formats[ i ] ) ){
+                target.appendChild( row );
+            }
         }
 
         i = 0;
         target = document.querySelector( '#yt-container #seperate-audio' );
         for( ; i < adaptiveAudio.length; i++ ){
-            row = displayInfo( adaptiveAudio[ i ] );
-            target.appendChild( row );
+            if ( row = displayInfo( adaptiveAudio[ i ] ) ){
+                target.appendChild( row );
+            }
         }
 
         i = 0;
         target = document.querySelector( '#yt-container #seperate-video' );
         for( ; i < adaptiveVideo.length; i++ ){
-            row = displayInfo( adaptiveVideo[ i ] );
-            target.appendChild( row );
+            if ( row = displayInfo( adaptiveVideo[ i ] ) ){
+                target.appendChild( row );
+            }
         }
     }
 
@@ -244,6 +249,15 @@
             mime      = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' ),
             size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2),
             type      = mime[ 1 ];
+
+        /*
+            Check if the size is a number!
+            If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist.
+            For now, just don't display the links, may need to check incase this is just a temporary bug.
+        */
+        if ( isNaN( size ) ){
+            return false;
+        }
 
         if ( mime[ 0 ] === 'video' ){
             switch( mime[ 1 ] ){

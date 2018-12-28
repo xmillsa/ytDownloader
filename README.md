@@ -1,6 +1,6 @@
 # ytDownloader
 A simple userscript for downloading Youtube Videos.  
-This script doesn't require any external scripts or libraries, the code you see is the code you get.
+This script doesn't require any external scripts or libraries, the code you see is the code you get, everything is done locally within your browser.
 
 It's very lightweight and should have a minimal performance impact.
 
