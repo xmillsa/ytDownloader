@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.1.3
+// @version     0.1.4
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
 // @author      Xmillsa
+// @description A simple script to enable in browser downloading of Youtube videos, no external scripts required.
 // @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
 // @grant       none
 // @match       https://www.youtube.com/*
@@ -79,60 +80,67 @@
 
     /*
         Downloads the requested video in chunks to bypass Youtubes bandwidth limitations and speed up downloads.
-        This works by first creating multiple promises requesting a "chunk" of data.
-        Once the promises are made, run them all at the same time and await a response. (may possibly change this in future to avoid sending too many requests)
+        This works by first creating multiple promises requesting a "chunk" of data. (this is how Youtube actually "streams" it's videos, it's why videos never fully load and only load as you're watching it)
+        Once the promises are made, run them all at the same time and await a response.
         Once the promises have all returned data, create an <a> link with that data and force a download.
     */
-    async function asyncDownload( data ){
-        const chunkSize = 5242880, // Chunks of 5 MB.
-              chunks = Math.ceil( data[ 'contentLength' ] / chunkSize ),
-              blobSize = Math.ceil( data[ 'contentLength' ] / chunks ),
-              blobArray = [];
+    async function asyncDownload( data, details ){
+        console.log(data);
+        console.log(details);
+        // Set request size.
+        const requestSize = 5242880, // 5 MB
+              blobArray   = [];
 
-              alert('Making, ' + chunks + ' requests.');
+        // Get number of chunks required and size of each chunk.
+        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+            i = 0,
+            start, end;
 
-        if (chunks > 10){
-            //return false;
+        // Limit the maximum amount of requests to 16, we don't want to inadvertently DDOS Youtube. 
+        if ( numChunks > 16 ){
+            numChunks = 16;
+            // Work out chunkSize again.
+            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
         }
-        let i = 0, start, end;
 
-        for( ; i < chunks; i++ ){
-            start = (blobSize + 1) * i;
-            end = start + blobSize;
-            // Create an array of blobs for our Promise.all request.
+        // Loop through the number of chunks required.
+        for( ; i < numChunks; i++ ){
+            // Work out the start and end range in bytes for our chunk request.
+            start = ( chunkSize + 1 ) * i;
+            end = start + chunkSize;
+            // Create an array of promise requests for our Promise.all request.
             blobArray.push( new Promise( async (resolv) => {
-                  let response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
-                      aBlob     = await response.blob();
-                  resolv( aBlob );
-              }) );
+                // Make our request and return a blob.
+                const response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                      aBlob    = await response.blob();
+                resolv( aBlob );
+            }));
         }
 
-        Promise.all( blobArray ).then( function (values) {
-            console.log(values);
+        // Run all of our promise requests and await their return.
+        Promise.all( blobArray ).then( function ( values ) {
+            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
+            const entireBlob = new Blob( values, { type: "octet/stream" } );
 
-            let newBlob = new Blob( values, {type: "octet/stream"} ),
-                url, a;
-            
-            console.log(newBlob);
-            
-            url = window.URL.createObjectURL(newBlob);
-            a = document.createElement('a');
-            
-            document.body.appendChild(a);
-            
-            a.href = url;
-            a.download = 'test name.mp4';
-            //a.target = '_blank';
+            let urlObject, a;
+
+            // Create a URL object with our returned blob data.
+            urlObject = window.URL.createObjectURL( entireBlob );
+            // Create a link element and set it's URL to our URL object.
+            a = document.createElement( 'a' );
+            // Add our link to the page.
+            document.body.appendChild( a );
+            a.href = urlObject;
+            // Set the filename.
+            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+            // Click the link! Should cause it to download if all has worked well.
             a.click();
-            
-            console.log(url);
-            console.log(a);
-            
+            // This element is no longer required.
             a.remove();
-            window.URL.revokeObjectURL(url);
-            //window.location.assign(url);
+            // Our URL object is no longer required.
+            window.URL.revokeObjectURL( urlObject );
         });
-        console.log('Promise all done, awaiting response?');
     }
 
     /*
@@ -220,7 +228,6 @@
                     resolve( document.querySelector( target ) );
                 } else {
                     // Can't find the target.
-                    //console.log( 'nope' );
                 }
             }, 500 );
         });
@@ -234,10 +241,12 @@
         then adds the returned element to the page.
     */
     async function createLinks( json ){
+        // Store video details.
+        const details       = json.videoDetails,
               // Store the combined video formats.
-        const formats  = json.streamingData.formats,
+              formats       = json.streamingData.formats,
               // Store the seperate video & audio formats.
-              adaptive = json.streamingData.adaptiveFormats,
+              adaptive      = json.streamingData.adaptiveFormats,
               // Store Video only.
               adaptiveVideo = [],
               // Store Audio only.
@@ -273,7 +282,7 @@
         i = 0;
         target = await findTheTarget( '#yt-container #combined' );
         for( ; i < formats.length; i++ ){
-            if ( row = displayInfo( formats[ i ] ) ){
+            if ( row = displayInfo( formats[ i ], details ) ){
                 target.appendChild( row );
             }
         }
@@ -281,7 +290,7 @@
         i = 0;
         target = await findTheTarget( '#yt-container #seperate-audio' );
         for( ; i < adaptiveAudio.length; i++ ){
-            if ( row = displayInfo( adaptiveAudio[ i ] ) ){
+            if ( row = displayInfo( adaptiveAudio[ i ], details ) ){
                 target.appendChild( row );
             }
         }
@@ -289,17 +298,21 @@
         i = 0;
         target = await findTheTarget( '#yt-container #seperate-video' );
         for( ; i < adaptiveVideo.length; i++ ){
-            if ( row = displayInfo( adaptiveVideo[ i ] ) ){
+            if ( row = displayInfo( adaptiveVideo[ i ], details ) ){
                 target.appendChild( row );
             }
         }
+    }
 
-        // If the list is opened before being populated, this will trick it into re-opening to show the now added links.
-        // If the list is closed, it will look like nothing happened.
+    /*
+        If the list is opened before being populated, this will trick it into re-opening to show the now added links.
+        If the list is closed, it will look like nothing happened.
+    */
+    function openCloseTrick(){
         document.getElementById( 'linksButton' ).click();
         document.getElementById( 'linksButton' ).click();
     }
-
+    
     /*
         Turns the individual JSON entry into a div row for displaying on page.
         Get all the vars, quality, mimetype & size.
@@ -307,12 +320,13 @@
         Create the div row element with the extracted data.
         return the div.
     */
-    function displayInfo( data ){
+    function displayInfo( data, details ){
         let row       = document.createElement( 'div' ),
             qual      = data[ 'qualityLabel' ],
             mime      = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' ),
             size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2),
-            type      = mime[ 1 ];
+            type      = mime[ 1 ],
+            title     = details[ 'title' ];
 
         /*
             Check if the size is a number!
@@ -349,41 +363,36 @@
                          <div class="left">
                              <a href='${data[ 'url' ]}' download target="_blank" title='${data[ 'mimeType' ].split( ';' )[0].split( '/' )[1]}'>Download ${type}</a>
                          </div>`;
-        
-        // DEBUG
-        let a = document.createElement('a'),
-        div = document.createElement('div');
-        
-        a.href = data['url'];
-        a.innerText = 'test';
-        a.dataset.contentLength = data[ 'contentLength' ];
+
+        // Create "link" for downloading.
+        let a   = document.createElement( 'a' ),
+            div = document.createElement( 'div' );
+
+        a.innerText = 'Download';
+        a.className = 'falseLink';
+
+        // Listen to clicks, once clicked start the download process.
         a.addEventListener('click', ( e ) => {
-            e.preventDefault();
-            
-            const theData = [];
-            
-            theData[ 'url' ] = e.target.href;
-            theData[ 'contentLength' ] = e.target.dataset.contentLength;
-            
-            asyncDownload( theData );
+            asyncDownload( data, details );
         });
-        
+
+        // Add the button to the end of the "row".
         div.appendChild(a);
         row.appendChild(div);
-        
+
         return row;
     }
 
     /*
         Some custom CSS for the container, button and links.
-        Uses some of Youtubes own CSS vars, ensures it works with youtubes Dark Theme mode without me writting extra css.
+        Uses some of Youtubes own CSS vars, ensures it works with youtubes Dark Theme mode.
     */
     function addCss(){
         // Check it's not already been added.
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -401,6 +410,7 @@
                   #yt-container .right{text-align:right}
                   #yt-container .left{text-align:left}
                   #yt-container .center{text-align:center}
+                  #yt-container .falseLink{cursor:pointer;text-decoration:underline}
                   ytd-video-primary-info-renderer{padding-top:10px}
                   `,
                   style = document.createElement( 'style' );
