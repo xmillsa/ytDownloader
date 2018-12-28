@@ -85,8 +85,6 @@
         Once the promises have all returned data, create an <a> link with that data and force a download.
     */
     async function asyncDownload( data, details ){
-        console.log(data);
-        console.log(details);
         // Set request size.
         const requestSize = 5242880, // 5 MB
               blobArray   = [];
@@ -108,9 +106,9 @@
         for( ; i < numChunks; i++ ){
             // Work out the start and end range in bytes for our chunk request.
             start = ( chunkSize + 1 ) * i;
-            end = start + chunkSize;
+            end   = start + chunkSize;
             // Create an array of promise requests for our Promise.all request.
-            blobArray.push( new Promise( async (resolv) => {
+            blobArray.push( new Promise( async ( resolv ) => {
                 // Make our request and return a blob.
                 const response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
                       aBlob    = await response.blob();
@@ -121,8 +119,8 @@
         // Run all of our promise requests and await their return.
         Promise.all( blobArray ).then( function ( values ) {
             // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
-            const entireBlob = new Blob( values, { type: "octet/stream" } );
-
+            // const entireBlob = new Blob( values, { type: "octet/stream" } );
+            const entireBlob = new Blob( values, { type: "video/mp4" } );
             let urlObject, a;
 
             // Create a URL object with our returned blob data.
@@ -286,6 +284,7 @@
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
 
         i = 0;
         target = await findTheTarget( '#yt-container #seperate-audio' );
@@ -294,6 +293,7 @@
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
 
         i = 0;
         target = await findTheTarget( '#yt-container #seperate-video' );
@@ -302,17 +302,19 @@
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
     }
 
     /*
         If the list is opened before being populated, this will trick it into re-opening to show the now added links.
-        If the list is closed, it will look like nothing happened.
+        If the list is closed, it will look like nothing happene.
+        Simply uses the click event which fires its open/close action, it works out its required height on open, hence why we do this.
     */
     function openCloseTrick(){
         document.getElementById( 'linksButton' ).click();
         document.getElementById( 'linksButton' ).click();
     }
-    
+
     /*
         Turns the individual JSON entry into a div row for displaying on page.
         Get all the vars, quality, mimetype & size.
@@ -323,10 +325,7 @@
     function displayInfo( data, details ){
         let row       = document.createElement( 'div' ),
             qual      = data[ 'qualityLabel' ],
-            mime      = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' ),
-            size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2),
-            type      = mime[ 1 ],
-            title     = details[ 'title' ];
+            size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
 
         /*
             Check if the size is a number!
@@ -337,21 +336,6 @@
             return false;
         }
 
-        if ( mime[ 0 ] === 'video' ){
-            switch( mime[ 1 ] ){
-                case '3gpp':
-                    type = '3gp';
-                break;
-            }
-        }
-        if ( mime[ 0 ] === 'audio' ){
-            switch( mime[ 1 ] ){
-                case 'mp4':
-                    type = 'm4a';
-                break;
-            }
-        }
-
         // Convert to Kbs for easier reading. (audio only)
         if ( qual === undefined ){
             qual = String(Number(data[ 'averageBitrate' ] / 1024 ).toFixed(0)) +' Kbs';
@@ -360,25 +344,18 @@
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
                          <div class="center">${qual}</div>
-                         <div class="left">
-                             <a href='${data[ 'url' ]}' download target="_blank" title='${data[ 'mimeType' ].split( ';' )[0].split( '/' )[1]}'>Download ${type}</a>
-                         </div>`;
+                         <div class="left"><a class="falseLink" href="#">Download</a></div>`;
 
         // Create "link" for downloading.
-        let a   = document.createElement( 'a' ),
-            div = document.createElement( 'div' );
-
+        let a = document.createElement( 'a' );
         a.innerText = 'Download';
         a.className = 'falseLink';
 
         // Listen to clicks, once clicked start the download process.
-        a.addEventListener('click', ( e ) => {
+        row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
+            e.preventDefault();
             asyncDownload( data, details );
         });
-
-        // Add the button to the end of the "row".
-        div.appendChild(a);
-        row.appendChild(div);
 
         return row;
     }
