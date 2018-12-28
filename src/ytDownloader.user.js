@@ -17,7 +17,7 @@
         prevURL = '';
 
     // Always check the URL for changes.
-    setInterval( checkURL, 50 );
+    setInterval( checkURL, 250 );
 
     /*
         Keep an eye on the URL for any changes, if it changes, run the main function.
@@ -62,13 +62,8 @@
                       // Parse the data so we can use it.
                       json     = parseData( data );
 
-                      // DEBUG
-                      console.log(json);
                 // Create the links.
                 createLinks( json );
-                
-                // Do some magic!
-                //requestBlobs( json );
             } else {
                 // Must be a page with no video.
             }
@@ -76,50 +71,45 @@
         catch( e ){
             /*
                 Errors, errors everywhere!
-                Not really but something went wrong.
+                Not really, but something went wrong...
             */
             console.log( e );
         }
     }
 
-    // DEBUG
     /*
-        Experimental, but works?!?! Awesome... (currently limited to the video of that URL below)
-        TODO:
-        get url, we already know from button links.
-        get contentLength
-        divide contentLength by number of requests, this is how many requests we will make.
-        make multiple promise requests.
-        await all promises in 1 go, return the file for download!        
+        Downloads the requested video in chunks to bypass Youtubes bandwidth limitations and speed up downloads.
+        This works by first creating multiple promises requesting a "chunk" of data.
+        Once the promises are made, run them all at the same time and await a response. (may possibly change this in future to avoid sending too many requests)
+        Once the promises have all returned data, create an <a> link with that data and force a download.
     */
-    async function requestBlobs( data ){
-        try{
-        const url = data[ 'url' ],
-              contentLength = data[ 'contentLength' ],
-              chunks = 4,
-              blobSize = Math.ceil( contentLength / chunks );
+    async function asyncDownload( data ){
+        const chunkSize = 5242880, // Chunks of 5 MB.
+              chunks = Math.ceil( data[ 'contentLength' ] / chunkSize ),
+              blobSize = Math.ceil( data[ 'contentLength' ] / chunks ),
+              blobArray = [];
 
-        //const url = 'https://r2---sn-8pgbpohxqp5-ac5l.googlevideo.com/videoplayback?lmt=1544814931381283&sparams=clen%2Cdur%2Cei%2Cgir%2Cid%2Cinitcwndbps%2Cip%2Cipbits%2Citag%2Clmt%2Cmime%2Cmm%2Cmn%2Cms%2Cmv%2Cpl%2Cratebypass%2Crequiressl%2Csource%2Cexpire&ipbits=0&initcwndbps=2085000&source=youtube&ei=Rn4lXPfZOZnO1gb9jISIBg&requiressl=yes&gir=yes&mn=sn-8pgbpohxqp5-ac5l%2Csn-aigl6n76&ip=86.22.149.11&mm=31%2C29&expire=1545982631&pl=22&itag=18&mv=m&mt=1545960958&ms=au%2Crdu&signature=B3F7B094A7E4491418912F0A2BCF87AE2F344874.41242B5B8BF7DFF7235927387B11FC8A57D035E4&id=o-AJiCTVd2BEtm5_HQijeXYGn3epzTUZFkaHhjSouMXhWU&mime=video%2Fmp4&key=yt6&txp=5531432&c=WEB&ratebypass=yes&clen=9370557&dur=173.197&fvip=4';
-        const blobArray = [];
-        
-        let i = 0,
-            start,
-            end;
+              alert('Making, ' + chunks + ' requests.');
+
+        if (chunks > 10){
+            //return false;
+        }
+        let i = 0, start, end;
 
         for( ; i < chunks; i++ ){
             start = (blobSize + 1) * i;
             end = start + blobSize;
-            console.log(start, end);
+            // Create an array of blobs for our Promise.all request.
             blobArray.push( new Promise( async (resolv) => {
-                  let response = await fetch( `${url}&range=${start}-${end}`, { method: 'GET' } ),
-                      data     = await response.blob();
-                  resolv( data );
+                  let response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                      aBlob     = await response.blob();
+                  resolv( aBlob );
               }) );
         }
 
         Promise.all( blobArray ).then( function (values) {
             console.log(values);
-            
+
             let newBlob = new Blob( values, {type: "octet/stream"} ),
                 url, a;
             
@@ -143,8 +133,6 @@
             //window.location.assign(url);
         });
         console.log('Promise all done, awaiting response?');
-        }
-        catch(e){console.log(e)}
     }
 
     /*
@@ -174,7 +162,7 @@
             // Set the div's attributes.
             div.id        = 'yt-container';
             div.className = 'style-scope ytd-watch-flexy';
-            div.innerHTML = '<button>Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
+            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
@@ -218,10 +206,10 @@
     }
 
     /*
-        This simply finds the requested target, used as a promise to allow waiting.
+        This simply finds the requested target, used as a promise to allow async waiting.
         Probably overkill but it just felt right making it this way.
         Will simply wait... forever, until the target is found.
-        This hasn't been tested for forced errors, so oould break, has worked every time in testing, so far...
+        This hasn't been tested for forced errors / never finding it's target, so oould potentially break, working so far...
     */
     function findTheTarget( target ){
         return new Promise( resolve => {
@@ -231,7 +219,8 @@
                     clearInterval( findingInt );
                     resolve( document.querySelector( target ) );
                 } else {
-                    console.log( 'nope' );
+                    // Can't find the target.
+                    //console.log( 'nope' );
                 }
             }, 500 );
         });
@@ -304,6 +293,11 @@
                 target.appendChild( row );
             }
         }
+
+        // If the list is opened before being populated, this will trick it into re-opening to show the now added links.
+        // If the list is closed, it will look like nothing happened.
+        document.getElementById( 'linksButton' ).click();
+        document.getElementById( 'linksButton' ).click();
     }
 
     /*
@@ -344,8 +338,8 @@
             }
         }
 
-        // Convert to Kbs for easier reading.
-        if (qual === undefined){
+        // Convert to Kbs for easier reading. (audio only)
+        if ( qual === undefined ){
             qual = String(Number(data[ 'averageBitrate' ] / 1024 ).toFixed(0)) +' Kbs';
         }
 
@@ -371,7 +365,7 @@
             theData[ 'url' ] = e.target.href;
             theData[ 'contentLength' ] = e.target.dataset.contentLength;
             
-            requestBlobs( theData );
+            asyncDownload( theData );
         });
         
         div.appendChild(a);
