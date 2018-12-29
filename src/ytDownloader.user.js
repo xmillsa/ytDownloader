@@ -79,69 +79,6 @@
     }
 
     /*
-        Downloads the requested video in chunks to bypass Youtubes bandwidth limitations and speed up downloads.
-        This works by first creating multiple promises requesting a "chunk" of data. (this is how Youtube actually "streams" it's videos, it's why videos never fully load and only load as you're watching it)
-        Once the promises are made, run them all at the same time and await a response.
-        Once the promises have all returned data, create an <a> link with that data and force a download.
-    */
-    async function asyncDownload( data, details ){
-        // Set request size.
-        const requestSize = 5242880, // 5 MB
-              blobArray   = [];
-
-        // Get number of chunks required and size of each chunk.
-        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
-            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
-            i = 0,
-            start, end;
-
-        // Limit the maximum amount of requests to 16, we don't want to inadvertently DDOS Youtube. 
-        if ( numChunks > 16 ){
-            numChunks = 16;
-            // Work out chunkSize again.
-            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
-        }
-
-        // Loop through the number of chunks required.
-        for( ; i < numChunks; i++ ){
-            // Work out the start and end range in bytes for our chunk request.
-            start = ( chunkSize + 1 ) * i;
-            end   = start + chunkSize;
-            // Create an array of promise requests for our Promise.all request.
-            blobArray.push( new Promise( async ( resolv ) => {
-                // Make our request and return a blob.
-                const response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
-                      aBlob    = await response.blob();
-                resolv( aBlob );
-            }));
-        }
-
-        // Run all of our promise requests and await their return.
-        Promise.all( blobArray ).then( function ( values ) {
-            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
-            // const entireBlob = new Blob( values, { type: "octet/stream" } );
-            const entireBlob = new Blob( values, { type: "video/mp4" } );
-            let urlObject, a;
-
-            // Create a URL object with our returned blob data.
-            urlObject = window.URL.createObjectURL( entireBlob );
-            // Create a link element and set it's URL to our URL object.
-            a = document.createElement( 'a' );
-            // Add our link to the page.
-            document.body.appendChild( a );
-            a.href = urlObject;
-            // Set the filename.
-            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
-            // Click the link! Should cause it to download if all has worked well.
-            a.click();
-            // This element is no longer required.
-            a.remove();
-            // Our URL object is no longer required.
-            window.URL.revokeObjectURL( urlObject );
-        });
-    }
-
-    /*
         Grabs the required sections of data from the fetch response.
         We only require the "player_response" section, once found, turn it into JSON for easy use.
     */
@@ -338,7 +275,7 @@
 
         // Convert to Kbs for easier reading. (audio only)
         if ( qual === undefined ){
-            qual = String(Number(data[ 'averageBitrate' ] / 1024 ).toFixed(0)) +' Kbs';
+            qual = String( Number(data[ 'averageBitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
         }
 
         row.className = 'row';
@@ -354,10 +291,88 @@
         // Listen to clicks, once clicked start the download process.
         row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
             e.preventDefault();
-            asyncDownload( data, details );
+            // Show an indication that the download has started in the background.
+            e.target.className = 'inProgress';
+            e.target.innerText = 'Downloading 0%';
+            
+            asyncDownload( data, details, e.target );
         });
 
         return row;
+    }
+
+    /*
+        Downloads the requested video in chunks to bypass Youtubes bandwidth limitations and speed up downloads.
+        This works by first creating multiple promises requesting a "chunk" of data. (this is how Youtube actually "streams" it's videos, it's why videos never fully load and only load as you're watching it)
+        Once the promises are made, run them all at the same time and await a response.
+        Once the promises have all returned data, create an <a> link with that data and force a download.
+    */
+    async function asyncDownload( data, details, calledFrom ){
+        // Set request size.
+        const requestSize = 1048576 * 2, // 2 MB
+              blobArray   = [],
+              maxRequests = 16;
+
+        // Get number of chunks required and size of each chunk.
+        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+            i = 0,
+            start, end;
+
+        // Limit the maximum number of requests, we don't want to inadvertently DDOS Youtube.
+        if ( numChunks > maxRequests ){
+            numChunks = maxRequests;
+            // Work out chunkSize again.
+            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
+        }
+
+        // Loop through the number of chunks required.
+        for( ; i < numChunks; i++ ){
+            // Work out the start and end range in bytes for our chunk request.
+            start = ( chunkSize + 1 ) * i;
+            end   = start + chunkSize;
+            // Create an array of promise requests for our Promise.all request.
+            blobArray.push( new Promise( async ( resolv ) => {
+                // Make our request and return a blob.
+                const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                      aBlob          = await response.blob(),
+                      // Progress updates.
+                      currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                      newPercent     = Number( currentPercent + ( ( 100 / numChunks ) ) ).toFixed( 2 );
+
+                // Display some basic percentage progress.
+                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                resolv( aBlob );
+            }));
+        }
+
+        // Run all of our promise requests and await their return.
+        Promise.all( blobArray ).then( function ( values ) {
+            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
+            // const entireBlob = new Blob( values, { type: "octet/stream" } );
+            const entireBlob = new Blob( values, { type: "video/mp4" } );
+            let urlObject, a;
+
+            // Create a URL object with our returned blob data.
+            urlObject = window.URL.createObjectURL( entireBlob );
+            // Create a link element and set it's URL to our URL object.
+            a = document.createElement( 'a' );
+            // Add our link to the page.
+            document.body.appendChild( a );
+            a.href = urlObject;
+            // Set the filename.
+            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+            // Click the link! Should cause it to download if all has worked well.
+            a.click();
+            // This element is no longer required.
+            a.remove();
+            // Our URL object is no longer required.
+            window.URL.revokeObjectURL( urlObject );
+            
+            // Reset the style of the link that was clicked.
+            calledFrom.className = '';
+            calledFrom.innerText = 'Download';
+        });
     }
 
     /*
@@ -379,7 +394,7 @@
                   #yt-container > button:hover,#yt-container.open > button{box-shadow:0 2px 0 0 var(--yt-spec-10-percent-layer)}
                   #yt-container > #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
                   #yt-container > #yt-links div{width:100%}
-                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin-top:.4em;border-top:1px solid var(--yt-spec-10-percent-layer)}
+                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin:.4em 0;padding-bottom:.4em;padding-top:.2em;border-bottom:1px solid var(--yt-spec-10-percent-layer);border-top:1px solid var(--yt-spec-10-percent-layer)}
                   #yt-container a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
                   #yt-container h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
                   #yt-container .row{display:flex;justify-content:space-evenly}
@@ -388,6 +403,7 @@
                   #yt-container .left{text-align:left}
                   #yt-container .center{text-align:center}
                   #yt-container .falseLink{cursor:pointer;text-decoration:underline}
+                  #yt-container .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
                   ytd-video-primary-info-renderer{padding-top:10px}
                   `,
                   style = document.createElement( 'style' );
