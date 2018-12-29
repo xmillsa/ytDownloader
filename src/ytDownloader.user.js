@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.1.3
+// @version     0.1.4
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
 // @author      Xmillsa
+// @description A simple script to enable in browser downloading of Youtube videos, no external scripts required.
 // @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
 // @grant       none
 // @match       https://www.youtube.com/*
@@ -17,7 +18,7 @@
         prevURL = '';
 
     // Always check the URL for changes.
-    setInterval( checkURL, 50 );
+    setInterval( checkURL, 250 );
 
     /*
         Keep an eye on the URL for any changes, if it changes, run the main function.
@@ -71,7 +72,7 @@
         catch( e ){
             /*
                 Errors, errors everywhere!
-                Not really but something went wrong.
+                Not really, but something went wrong...
             */
             console.log( e );
         }
@@ -104,7 +105,7 @@
             // Set the div's attributes.
             div.id        = 'yt-container';
             div.className = 'style-scope ytd-watch-flexy';
-            div.innerHTML = '<button>Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
+            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
@@ -148,10 +149,10 @@
     }
 
     /*
-        This simply finds the requested target, used as a promise to allow waiting.
+        This simply finds the requested target, used as a promise to allow async waiting.
         Probably overkill but it just felt right making it this way.
         Will simply wait... forever, until the target is found.
-        This hasn't been tested for forced errors, so oould break, has worked every time in testing, so far...
+        This hasn't been tested for forced errors / never finding it's target, so oould potentially break, working so far...
     */
     function findTheTarget( target ){
         return new Promise( resolve => {
@@ -161,7 +162,7 @@
                     clearInterval( findingInt );
                     resolve( document.querySelector( target ) );
                 } else {
-                    console.log( 'nope' );
+                    // Can't find the target.
                 }
             }, 500 );
         });
@@ -174,11 +175,13 @@
         then simply loops through the arrays, sedns each entry to the "displayInfo" function,
         then adds the returned element to the page.
     */
-    function createLinks( json ){
+    async function createLinks( json ){
+        // Store video details.
+        const details       = json.videoDetails,
               // Store the combined video formats.
-        const formats  = json.streamingData.formats,
+              formats       = json.streamingData.formats,
               // Store the seperate video & audio formats.
-              adaptive = json.streamingData.adaptiveFormats,
+              adaptive      = json.streamingData.adaptiveFormats,
               // Store Video only.
               adaptiveVideo = [],
               // Store Audio only.
@@ -212,28 +215,42 @@
             Loop through the previously made, now sorted arrays and display the required infomation.
         */
         i = 0;
-        target = document.querySelector( '#yt-container #combined' );
+        target = await findTheTarget( '#yt-container #combined' );
         for( ; i < formats.length; i++ ){
-            if ( row = displayInfo( formats[ i ] ) ){
+            if ( row = displayInfo( formats[ i ], details ) ){
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
 
         i = 0;
-        target = document.querySelector( '#yt-container #seperate-audio' );
+        target = await findTheTarget( '#yt-container #seperate-audio' );
         for( ; i < adaptiveAudio.length; i++ ){
-            if ( row = displayInfo( adaptiveAudio[ i ] ) ){
+            if ( row = displayInfo( adaptiveAudio[ i ], details ) ){
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
 
         i = 0;
-        target = document.querySelector( '#yt-container #seperate-video' );
+        target = await findTheTarget( '#yt-container #seperate-video' );
         for( ; i < adaptiveVideo.length; i++ ){
-            if ( row = displayInfo( adaptiveVideo[ i ] ) ){
+            if ( row = displayInfo( adaptiveVideo[ i ], details ) ){
                 target.appendChild( row );
             }
         }
+        openCloseTrick();
+    }
+
+    /*
+        If the list is opened before being populated, this will trick it into re-opening to show the now added links.
+        If the list is closed, it will look like nothing happene.
+        Simply uses the click event which fires its open/close action, it works out its required height on open, hence why we do this.
+    */
+    function openCloseTrick(){
+        const target = document.getElementById( 'linksButton' );
+        target.click();
+        target.click();
     }
 
     /*
@@ -243,61 +260,132 @@
         Create the div row element with the extracted data.
         return the div.
     */
-    function displayInfo( data ){
-        let row       = document.createElement( 'div' ),
-            qual      = data[ 'qualityLabel' ],
-            mime      = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' ),
-            size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2),
-            type      = mime[ 1 ];
+    function displayInfo( data, details ){
+        let row  = document.createElement( 'div' ),
+            qual = data[ 'qualityLabel' ],
+            size = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
 
         /*
             Check if the size is a number!
-            If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist.
-            For now, just don't display the links, may need to check incase this is just a temporary bug.
+            If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist, even though Youtube seems to think it does.
+            For now, just don't display the links, may need to re-check this in the future incase this is just a temporary bug.
         */
         if ( isNaN( size ) ){
             return false;
         }
 
-        if ( mime[ 0 ] === 'video' ){
-            switch( mime[ 1 ] ){
-                case '3gpp':
-                    type = '3gp';
-                break;
-            }
-        }
-        if ( mime[ 0 ] === 'audio' ){
-            switch( mime[ 1 ] ){
-                case 'mp4':
-                    type = 'm4a';
-                break;
-            }
-        }
-
-        // Convert to Kbs for easier reading.
-        if (qual === undefined){
-            qual = String(Number(data[ 'averageBitrate' ] / 1024 ).toFixed(0)) +' Kbs';
+        // Convert to Kbs for easier reading. (audio only)
+        if ( qual === undefined ){
+            qual = String( Number(data[ 'averageBitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
         }
 
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
                          <div class="center">${qual}</div>
-                         <div class="left">
-                             <a href='${data[ 'url' ]}' download target="_blank" title='${data[ 'mimeType' ].split( ';' )[0].split( '/' )[1]}'>Download ${type}</a>
-                         </div>`;
+                         <div class="left"><a class="falseLink" href="#">Download</a></div>`;
+
+        // Create "link" for downloading.
+        let a = document.createElement( 'a' );
+        a.innerText = 'Download';
+        a.className = 'falseLink';
+
+        // Listen to clicks, once clicked start the download process.
+        row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
+            e.preventDefault();
+            // Show an indication that the download has started in the background.
+            e.target.className = 'inProgress';
+            e.target.innerText = 'Downloading 0%';
+            
+            asyncDownload( data, details, e.target );
+        });
+
         return row;
     }
 
     /*
+        Downloads the requested video in chunks to bypass Youtubes bandwidth limitations and speed up downloads.
+        This works by first creating multiple promises requesting a "chunk" of data. (this is how Youtube actually "streams" it's videos, it's why videos never fully load and only load as you're watching it)
+        Once the promises are made, run them all at the same time and await a response.
+        Once the promises have all returned data, create an <a> link with that data and force a download.
+    */
+    async function asyncDownload( data, details, calledFrom ){
+        // Set request size.
+        const requestSize = 1048576 * 2, // 2 MB
+              blobArray   = [],
+              maxRequests = 16;
+
+        // Get number of chunks required and size of each chunk.
+        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+            i = 0,
+            start, end;
+
+        // Limit the maximum number of requests, we don't want to inadvertently DDOS Youtube.
+        if ( numChunks > maxRequests ){
+            numChunks = maxRequests;
+            // Work out chunkSize again.
+            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
+        }
+
+        // Loop through the number of chunks required.
+        for( ; i < numChunks; i++ ){
+            // Work out the start and end range in bytes for our chunk request.
+            start = ( chunkSize + 1 ) * i;
+            end   = start + chunkSize;
+            // Create an array of promise requests for our Promise.all request.
+            blobArray.push( new Promise( async ( resolv ) => {
+                // Make our request and return a blob.
+                const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                      aBlob          = await response.blob(),
+                      // Progress updates.
+                      currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                      newPercent     = Number( currentPercent + ( ( 100 / numChunks ) ) ).toFixed( 2 );
+
+                // Display some basic percentage progress.
+                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                resolv( aBlob );
+            }));
+        }
+
+        // Run all of our promise requests and await their return.
+        Promise.all( blobArray ).then( function ( values ) {
+            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
+            // const entireBlob = new Blob( values, { type: "octet/stream" } );
+            const entireBlob = new Blob( values, { type: "video/mp4" } );
+            let urlObject, a;
+
+            // Create a URL object with our returned blob data.
+            urlObject = window.URL.createObjectURL( entireBlob );
+            // Create a link element and set it's URL to our URL object.
+            a = document.createElement( 'a' );
+            // Add our link to the page.
+            document.body.appendChild( a );
+            a.href = urlObject;
+            // Set the filename.
+            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+            // Click the link! Should cause it to download if all has worked well.
+            a.click();
+            // This element is no longer required.
+            a.remove();
+            // Our URL object is no longer required.
+            window.URL.revokeObjectURL( urlObject );
+            
+            // Reset the style of the link that was clicked.
+            calledFrom.className = '';
+            calledFrom.innerText = 'Download';
+        });
+    }
+
+    /*
         Some custom CSS for the container, button and links.
-        Uses some of Youtubes own CSS vars, ensures it works with youtubes Dark Theme mode without me writting extra css.
+        Uses some of Youtubes own CSS vars, ensures it works with youtubes Dark Theme mode.
     */
     function addCss(){
         // Check it's not already been added.
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -307,7 +395,7 @@
                   #yt-container > button:hover,#yt-container.open > button{box-shadow:0 2px 0 0 var(--yt-spec-10-percent-layer)}
                   #yt-container > #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
                   #yt-container > #yt-links div{width:100%}
-                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin-top:.4em;border-top:1px solid var(--yt-spec-10-percent-layer)}
+                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin:.4em 0;padding-bottom:.4em;padding-top:.2em;border-bottom:1px solid var(--yt-spec-10-percent-layer);border-top:1px solid var(--yt-spec-10-percent-layer)}
                   #yt-container a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
                   #yt-container h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
                   #yt-container .row{display:flex;justify-content:space-evenly}
@@ -315,6 +403,8 @@
                   #yt-container .right{text-align:right}
                   #yt-container .left{text-align:left}
                   #yt-container .center{text-align:center}
+                  #yt-container .falseLink{cursor:pointer;text-decoration:underline}
+                  #yt-container .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
                   ytd-video-primary-info-renderer{padding-top:10px}
                   `,
                   style = document.createElement( 'style' );
