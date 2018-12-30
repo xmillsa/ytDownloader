@@ -349,15 +349,13 @@
 
         // Run all of our promise requests and await their return.
         Promise.all( blobArray ).then( function ( values ) {
-            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
-            // const entireBlob = new Blob( values, { type: "octet/stream" } );
-            const entireBlob = new Blob( values, { type: "video/mp4" } );
-            let urlObject, a;
+            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream.
+            const entireBlob = new Blob( values, { type: 'application/octet-stream' } ),
+                  // Create a URL object with our returned blob data.
+                  urlObject = window.URL.createObjectURL( entireBlob ),
+                  // Create a link element and set it's URL to our URL object.
+                  a = document.createElement( 'a' );
 
-            // Create a URL object with our returned blob data.
-            urlObject = window.URL.createObjectURL( entireBlob );
-            // Create a link element and set it's URL to our URL object.
-            a = document.createElement( 'a' );
             // Add our link to the page.
             document.body.appendChild( a );
             a.href = urlObject;
