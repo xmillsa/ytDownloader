@@ -3,7 +3,7 @@ A simple userscript for downloading Youtube Videos.
 This script doesn't require any external scripts or libraries, the code you see is the code you get, everything is done locally within _your_ browser.
 
 ## Installation
-Simply install one of the following: Greasemonkey [[F][FF Greasemonkey]], Violentmonkey [[F][FF Violentmonkey]][[C][Ch Violentmonkey]], Tampermonkey [[F][FF Tampermonkey]][[C][Ch Tampermonkey]]  
+Simply install one of the following: Greasemonkey [[ff][FF Greasemonkey]], Violentmonkey [[ff][FF Violentmonkey]][[ch][Ch Violentmonkey]], Tampermonkey [[ff][FF Tampermonkey]][[ch][Ch Tampermonkey]]  
 Click this link: [ytDownloader.user.js](https://github.com/xmillsa/ytDownloader/raw/master/src/ytDownloader.user.js)  
 Your chosen add-on should then provide you with an install option, simply follow the instructions.
 
