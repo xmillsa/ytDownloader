@@ -109,7 +109,7 @@
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
-                if (div.classList.contains( 'open' ) === false){
+                if ( div.classList.contains( 'open' ) === false ){
                     let currentHeight = div.clientHeight;
                     // Work out required height.
                     // Temporarily disable transitions.
@@ -383,7 +383,7 @@
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin:.3em 0 1px 0;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -397,7 +397,7 @@
                   #yt-container > #yt-links > div{border-color:var(--yt-spec-10-percent-layer);border-width:0 0 1px 0;border-style:solid;margin:0;padding:.2em}
                   #yt-container > #yt-links > div > div{padding:.4em}
                   #yt-container > #yt-links a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
-                  #yt-container > #yt-links h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
+                  #yt-container > #yt-links h3{font-weight:300;margin:0;padding:.1em 0 .2em 0;text-align:center}
                   #yt-container > #yt-links .row{display:flex;justify-content:space-evenly}
                   #yt-container > #yt-links .right{text-align:right}
                   #yt-container > #yt-links .left{text-align:left}
