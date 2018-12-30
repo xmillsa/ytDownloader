@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.2.0
+// @version     0.2.1
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -105,7 +105,7 @@
             // Set the div's attributes.
             div.id        = 'yt-container';
             div.className = 'style-scope ytd-watch-flexy';
-            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
+            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><div><h3>Video & Audio Combined</h3><div id="combined"></div></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div><div class="center footer flex"><div>Left Click = Potentially Quicker Download</div><div>Right Click -> Save As = Normal Download</div></div>';
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
@@ -283,7 +283,7 @@
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
                          <div class="center">${qual}</div>
-                         <div class="left"><a class="falseLink" href="#">Download</a></div>`;
+                         <div class="left"><a class="falseLink" href="${ data[ 'url' ] }">Download</a></div>`;
 
         // Create "link" for downloading.
         let a = document.createElement( 'a' );
@@ -391,18 +391,20 @@
                   #yt-container.open > button::after{transform:rotate(-90deg)}
                   #yt-container > button:active{margin:0;padding:0}
                   #yt-container > button:hover,#yt-container.open > button{box-shadow:0 2px 0 0 var(--yt-spec-10-percent-layer)}
+                  #yt-container > #yt-links .flex{display:flex;flex-direction:row;justify-content:space-evenly}
                   #yt-container > #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
                   #yt-container > #yt-links div{width:100%}
-                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin:.4em 0;padding-bottom:.4em;padding-top:.2em;border-bottom:1px solid var(--yt-spec-10-percent-layer);border-top:1px solid var(--yt-spec-10-percent-layer)}
-                  #yt-container a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
-                  #yt-container h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
-                  #yt-container .row{display:flex;justify-content:space-evenly}
-                  #yt-container .row div{width:33%}
-                  #yt-container .right{text-align:right}
-                  #yt-container .left{text-align:left}
-                  #yt-container .center{text-align:center}
-                  #yt-container .falseLink{cursor:pointer;text-decoration:underline}
-                  #yt-container .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
+                  #yt-container > #yt-links > div{border-color:var(--yt-spec-10-percent-layer);border-width:0 0 1px 0;border-style:solid;margin:0;padding:.2em}
+                  #yt-container > #yt-links > div > div{padding:.4em}
+                  #yt-container > #yt-links a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
+                  #yt-container > #yt-links h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
+                  #yt-container > #yt-links .row{display:flex;justify-content:space-evenly}
+                  #yt-container > #yt-links .right{text-align:right}
+                  #yt-container > #yt-links .left{text-align:left}
+                  #yt-container > #yt-links .center{text-align:center}
+                  #yt-container > #yt-links .falseLink{cursor:pointer;text-decoration:underline}
+                  #yt-container > #yt-links .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
+                  #yt-container > #yt-links .footer{background-color:var(--yt-playlist-background-item);font-size:.86em;padding:0}
                   ytd-video-primary-info-renderer{padding-top:10px}
                   `,
                   style = document.createElement( 'style' );
