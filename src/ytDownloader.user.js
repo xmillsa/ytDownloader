@@ -83,8 +83,8 @@
         We only require the "player_response" section, once found, turn it into JSON for easy use.
     */
     function parseData( data ){
-        let captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
-            json     = JSON.parse(decodeURIComponent( captured ) );
+        const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
+              json     = JSON.parse(decodeURIComponent( captured ) );
 
         return json;
     }
@@ -261,9 +261,10 @@
         return the div.
     */
     function displayInfo( data, details ){
-        let row  = document.createElement( 'div' ),
-            qual = data[ 'qualityLabel' ],
-            size = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
+        const row  = document.createElement( 'div' ),
+              size = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
+
+        let qual = data[ 'qualityLabel' ];
 
         /*
             Check if the size is a number!
@@ -367,7 +368,6 @@
             a.remove();
             // Our URL object is no longer required.
             window.URL.revokeObjectURL( urlObject );
-            
             // Reset the style of the link that was clicked.
             calledFrom.className = '';
             calledFrom.innerText = 'Download';
