@@ -313,7 +313,7 @@
         // Set request size.
         const requestSize = 1048576 * 2, // 2 MB
               blobArray   = [],
-              maxRequests = 2;
+              maxRequests = 16;
 
         // Get number of chunks required and size of each chunk.
         let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
@@ -348,6 +348,7 @@
             }));
         }
 
+        try{
         // Run all of our promise requests and await their return.
         Promise.all( blobArray ).then( values => {
             // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream.
@@ -372,6 +373,10 @@
             calledFrom.className = '';
             calledFrom.innerText = 'Download';
         });
+        }
+        catch(e){
+            console.log(e);
+        }
     }
 
     /*
