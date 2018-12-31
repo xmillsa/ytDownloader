@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.2.1
+// @version     0.2.2
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -313,7 +313,7 @@
         // Set request size.
         const requestSize = 1048576 * 2, // 2 MB
               blobArray   = [],
-              maxRequests = 12;
+              maxRequests = 2;
 
         // Get number of chunks required and size of each chunk.
         let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
@@ -335,19 +335,16 @@
             end   = start + chunkSize;
             // Create an array of promise requests for our Promise.all request.
             blobArray.push( new Promise( async ( resolv ) => {
-                // Slightly delay each fetch request, possibly being caught by Youtube sending requests at the same time.
-                setTimeout( async () => {
-                    // Make our request and return a blob.
-                    const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
-                          aBlob          = await response.blob(),
-                          // Progress updates.
-                          currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
-                          newPercent     = Number( currentPercent + ( ( 100 / numChunks ) ) ).toFixed( 2 );
+                // Make our request and return a blob.
+                const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                      aBlob          = await response.blob(),
+                      // Progress updates.
+                      currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                      newPercent     = Number( currentPercent + ( ( 100 / numChunks ) ) ).toFixed( 2 );
 
-                    // Display some basic percentage progress.
-                    calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
-                    resolv( aBlob );
-                }, 300 * i );
+                // Display some basic percentage progress.
+                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                resolv( aBlob );
             }));
         }
 
