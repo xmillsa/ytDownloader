@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.1.4
+// @version     0.2.3
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -83,8 +83,8 @@
         We only require the "player_response" section, once found, turn it into JSON for easy use.
     */
     function parseData( data ){
-        let captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
-            json     = JSON.parse(decodeURIComponent( captured ) );
+        const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
+              json     = JSON.parse(decodeURIComponent( captured ) );
 
         return json;
     }
@@ -105,11 +105,11 @@
             // Set the div's attributes.
             div.id        = 'yt-container';
             div.className = 'style-scope ytd-watch-flexy';
-            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><h3>Video & Audio Combined</h3><div id="combined"></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div></div>';
+            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><div><h3>Video & Audio Combined</h3><div id="combined"></div></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div><div class="center footer flex"><div>Left Click = Potentially Quicker Download</div><div>Right Click -> Save As = Normal Download</div></div>';
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
-                if (div.classList.contains( 'open' ) === false){
+                if ( div.classList.contains( 'open' ) === false ){
                     let currentHeight = div.clientHeight;
                     // Work out required height.
                     // Temporarily disable transitions.
@@ -248,8 +248,9 @@
         Simply uses the click event which fires its open/close action, it works out its required height on open, hence why we do this.
     */
     function openCloseTrick(){
-        document.getElementById( 'linksButton' ).click();
-        document.getElementById( 'linksButton' ).click();
+        const target = document.getElementById( 'linksButton' );
+        target.click();
+        target.click();
     }
 
     /*
@@ -260,9 +261,10 @@
         return the div.
     */
     function displayInfo( data, details ){
-        let row       = document.createElement( 'div' ),
-            qual      = data[ 'qualityLabel' ],
-            size      = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
+        const row  = document.createElement( 'div' ),
+              size = Number( data[ 'contentLength' ] / 1024 / 1024 ).toFixed(2);
+
+        let qual = data[ 'qualityLabel' ];
 
         /*
             Check if the size is a number!
@@ -275,13 +277,13 @@
 
         // Convert to Kbs for easier reading. (audio only)
         if ( qual === undefined ){
-            qual = String( Number(data[ 'averageBitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
+            qual = String( Number( data[ 'averageBitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
         }
 
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
                          <div class="center">${qual}</div>
-                         <div class="left"><a class="falseLink" href="#">Download</a></div>`;
+                         <div class="left"><a class="falseLink" href="${ data[ 'url' ] }">Download</a></div>`;
 
         // Create "link" for downloading.
         let a = document.createElement( 'a' );
@@ -294,11 +296,84 @@
             // Show an indication that the download has started in the background.
             e.target.className = 'inProgress';
             e.target.innerText = 'Downloading 0%';
-            
-            asyncDownload( data, details, e.target );
+
+            //asyncDownload( data, details, e.target );
+
+            // Try a new way of downloading...
+            progressiveDownload( data, details, e.target );
         });
 
         return row;
+    }
+
+    async function progressiveDownload( data, details, calledFrom ){
+        try{
+            // Set request size.
+            const requestSize = 1048576 * 2, // 2 MB
+                  blobArray   = [],
+                  maxRequests = 100;
+
+            // Get number of chunks required and size of each chunk.
+            let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
+                chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+                i = 0,
+                start, end,
+                entireBlob = new Blob( [], { type: 'application/octet-stream' } );
+
+            // Limit the maximum number of requests, we don't want to inadvertently DDOS Youtube.
+            if ( numChunks > maxRequests ){
+                numChunks = maxRequests;
+                // Work out chunkSize again.
+                chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
+            }
+
+            // Loop through the number of chunks required.
+            for( ; i < numChunks; i++ ){
+                // Work out the start and end range in bytes for our chunk request.
+                start = ( chunkSize + 1 ) * i;
+                end   = start + chunkSize;
+
+                // Create an array of promise requests for our Promise.all request.
+                let blob = await new Promise( async ( resolv ) => {
+                    // Make our request and return a blob.
+                    const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
+                          aBlob          = await response.blob(),
+                          // Progress updates.
+                          currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                          newPercent     = Number( ((i + 1) / numChunks) * 100 ).toFixed( 2 );
+
+                    // Display some basic percentage progress.
+                    calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                    resolv( aBlob );
+                });
+                entireBlob = new Blob( [entireBlob, blob], { type: 'application/octet-stream' } );
+            }
+
+            const // Create a URL object with our returned blob data.
+                  urlObject = window.URL.createObjectURL( entireBlob ),
+                  // Create a link element and set it's URL to our URL object.
+                  a = document.createElement( 'a' );
+
+            // Add our link to the page.
+            document.body.appendChild( a );
+            a.href = urlObject;
+            // Set the filename.
+            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+            // Click the link! Should cause it to download if all has worked well.
+            a.click();
+            // This element is no longer required.
+            a.remove();
+            // Our URL object is no longer required.
+            window.URL.revokeObjectURL( urlObject );
+            // Reset the style of the link that was clicked.
+            calledFrom.className = '';
+            calledFrom.innerText = 'Download';
+        }
+        catch(e){
+            console.log(e);
+            calledFrom.className = '';
+            calledFrom.innerText = 'Download*';
+        }
     }
 
     /*
@@ -311,7 +386,7 @@
         // Set request size.
         const requestSize = 1048576 * 2, // 2 MB
               blobArray   = [],
-              maxRequests = 16;
+              maxRequests = 8;
 
         // Get number of chunks required and size of each chunk.
         let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
@@ -346,45 +421,51 @@
             }));
         }
 
-        // Run all of our promise requests and await their return.
-        Promise.all( blobArray ).then( function ( values ) {
-            // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream for easy downloading.
-            // const entireBlob = new Blob( values, { type: "octet/stream" } );
-            const entireBlob = new Blob( values, { type: "video/mp4" } );
-            let urlObject, a;
+        try{
+            // Run all of our promise requests and await their return.
+            Promise.all( blobArray ).then( values => {
+                // Makes a blob from all of the other blobs, this is our requested video, also store it's type as a stream.
+                const entireBlob = new Blob( values, { type: 'application/octet-stream' } ),
+                      // Create a URL object with our returned blob data.
+                      urlObject = window.URL.createObjectURL( entireBlob ),
+                      // Create a link element and set it's URL to our URL object.
+                      a = document.createElement( 'a' );
 
-            // Create a URL object with our returned blob data.
-            urlObject = window.URL.createObjectURL( entireBlob );
-            // Create a link element and set it's URL to our URL object.
-            a = document.createElement( 'a' );
-            // Add our link to the page.
-            document.body.appendChild( a );
-            a.href = urlObject;
-            // Set the filename.
-            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
-            // Click the link! Should cause it to download if all has worked well.
-            a.click();
-            // This element is no longer required.
-            a.remove();
-            // Our URL object is no longer required.
-            window.URL.revokeObjectURL( urlObject );
-            
-            // Reset the style of the link that was clicked.
+                // Add our link to the page.
+                document.body.appendChild( a );
+                a.href = urlObject;
+                // Set the filename.
+                a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+                // Click the link! Should cause it to download if all has worked well.
+                a.click();
+                // This element is no longer required.
+                a.remove();
+                // Our URL object is no longer required.
+                window.URL.revokeObjectURL( urlObject );
+                // Reset the style of the link that was clicked.
+                calledFrom.className = '';
+                calledFrom.innerText = 'Download';
+            }).catch( ( e ) => {
+                console.log( e );
+            });
+        }
+        catch(e){
+            console.log(e);
             calledFrom.className = '';
-            calledFrom.innerText = 'Download';
-        });
+            calledFrom.innerText = 'Download*';
+        }
     }
 
     /*
         Some custom CSS for the container, button and links.
-        Uses some of Youtubes own CSS vars, ensures it works with youtubes Dark Theme mode.
+        Uses some of Youtubes own CSS vars, ensures it works with Youtubes Dark Theme mode.
     */
     function addCss(){
         // Check it's not already been added.
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin-top:.3em;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin:.3em 0 1px 0;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -392,18 +473,20 @@
                   #yt-container.open > button::after{transform:rotate(-90deg)}
                   #yt-container > button:active{margin:0;padding:0}
                   #yt-container > button:hover,#yt-container.open > button{box-shadow:0 2px 0 0 var(--yt-spec-10-percent-layer)}
-                  #yt-container > #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
-                  #yt-container > #yt-links div{width:100%}
-                  #yt-container > #yt-links > div.flex{display:flex;flex-direction:row;justify-content:space-evenly;margin:.4em 0;padding-bottom:.4em;padding-top:.2em;border-bottom:1px solid var(--yt-spec-10-percent-layer);border-top:1px solid var(--yt-spec-10-percent-layer)}
-                  #yt-container a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
-                  #yt-container h3{font-weight:300;margin:0;padding:.2em 0;text-align:center}
-                  #yt-container .row{display:flex;justify-content:space-evenly}
-                  #yt-container .row div{width:33%}
-                  #yt-container .right{text-align:right}
-                  #yt-container .left{text-align:left}
-                  #yt-container .center{text-align:center}
-                  #yt-container .falseLink{cursor:pointer;text-decoration:underline}
-                  #yt-container .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
+                  #yt-links .flex{display:flex;flex-direction:row;justify-content:space-evenly}
+                  #yt-links{display:flex;flex-direction:column;justify-content:space-evenly;position:relative;width:100%}
+                  #yt-links div{width:100%}
+                  #yt-links > div{border-color:var(--yt-spec-10-percent-layer);border-width:0 0 1px 0;border-style:solid;margin:0;padding:.2em}
+                  #yt-links > div > div{padding:.4em}
+                  #yt-links a{color:var(--yt-endpoint-color,var(--yt-spec-icon-active-button-link))}
+                  #yt-links h3{font-weight:300;margin:0;padding:.1em 0 .2em 0;text-align:center}
+                  #yt-links .row{display:flex;justify-content:space-evenly}
+                  #yt-links .right{text-align:right}
+                  #yt-links .left{text-align:left}
+                  #yt-links .center{text-align:center}
+                  #yt-links .falseLink{cursor:pointer;text-decoration:underline}
+                  #yt-links .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
+                  #yt-links .footer{background-color:var(--yt-playlist-background-item);font-size:.86em;padding:0}
                   ytd-video-primary-info-renderer{padding-top:10px}
                   `,
                   style = document.createElement( 'style' );
