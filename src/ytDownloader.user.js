@@ -4,7 +4,7 @@
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
-// @author      Xmillsa
+// @author      Andy Mills
 // @description A simple script to enable in browser downloading of Youtube videos, no external scripts required.
 // @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
 // @grant       none
@@ -43,7 +43,7 @@
         Grab the video ID from the URL,
         Fetch the videos details and await its arrival,
         Turn that data into something usable,
-        Create the actual links and visile data.
+        Create the actual links and visible data.
     */
     async function main(){
         try{
@@ -57,9 +57,9 @@
                 createContainer();
 
                 // Get the current video ID from the URL.
-                const videoID  = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
-                      response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } ),
-                      data     = await response.text(),
+                const videoID = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
+                      data    = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
+                                      .then( response => response.text() ),
                       // Parse the data so we can use it.
                       json     = parseData( data );
 
@@ -141,9 +141,9 @@
             document.querySelector( '#yt-container' ).removeAttribute( 'class' );
             // Empty the #combined div.
             document.querySelector( '#yt-container #combined' ).innerText = '';
-            // Empty the #seperate div.
+            // Empty the #separate div.
             document.querySelector( '#yt-container #seperate-audio' ).innerText = '';
-            // Empty the #seperate div.
+            // Empty the #separate div.
             document.querySelector( '#yt-container #seperate-video' ).innerText = '';
         }
     }
@@ -152,7 +152,7 @@
         This simply finds the requested target, used as a promise to allow async waiting.
         Probably overkill but it just felt right making it this way.
         Will simply wait... forever, until the target is found.
-        This hasn't been tested for forced errors / never finding it's target, so oould potentially break, working so far...
+        This hasn't been tested for forced errors / never finding it's target, so could potentially break, working so far...
     */
     function findTheTarget( target ){
         return new Promise( resolve => {
@@ -172,7 +172,7 @@
         Creates all the information and download links for the parsed JSON data.
         Stores the 2 types of videos, "formats" and "adaptive" into arrays,
         will then sort those into ascending order of "contentLength" (Filesize),
-        then simply loops through the arrays, sedns each entry to the "displayInfo" function,
+        then simply loops through the arrays, sends each entry to the "displayInfo" function,
         then adds the returned element to the page.
     */
     async function createLinks( json ){
@@ -188,7 +188,7 @@
               adaptiveAudio = [];
 
         let row, target, i = 0;
-        // Loops through the adaptive array and stores the audio and video links seperately.
+        // Loops through the adaptive array and stores the audio and video links separately.
         for( ; i < adaptive.length; i++ ){
             if ( adaptive[ i ].mimeType.split( ';' )[ 0 ].split( '/' )[ 0 ] === 'audio' ){
                 // Send to Audio only array.
@@ -212,7 +212,7 @@
         });
 
         /*
-            Loop through the previously made, now sorted arrays and display the required infomation.
+            Loop through the previously made, now sorted arrays and display the required information.
         */
         i = 0;
         target = await findTheTarget( '#yt-container #combined' );
@@ -244,7 +244,7 @@
 
     /*
         If the list is opened before being populated, this will trick it into re-opening to show the now added links.
-        If the list is closed, it will look like nothing happene.
+        If the list is closed, it will look like nothing happened.
         Simply uses the click event which fires its open/close action, it works out its required height on open, hence why we do this.
     */
     function openCloseTrick(){
@@ -256,7 +256,7 @@
     /*
         Turns the individual JSON entry into a div row for displaying on page.
         Get all the vars, quality, mimetype & size.
-        Work out "3gp" and "m4a" seperately, all the others can be extracted from the mimetype entry itself,
+        Work out "3gp" and "m4a" separately, all the others can be extracted from the mimetype entry itself,
         Create the div row element with the extracted data.
         return the div.
     */
@@ -269,7 +269,7 @@
         /*
             Check if the size is a number!
             If there is no contentLength within the original data from Youtube, the video doesn't seem to work / even exist, even though Youtube seems to think it does.
-            For now, just don't display the links, may need to re-check this in the future incase this is just a temporary bug.
+            For now, just don't display the links, may need to re-check this in the future in-case this is just a temporary bug.
         */
         if ( isNaN( size ) ){
             return false;
@@ -307,72 +307,111 @@
     }
 
     async function progressiveDownload( data, details, calledFrom ){
-        try{
-            // Set request size.
-            const requestSize = 1048576 * 2, // 2 MB
-                  blobArray   = [],
-                  maxRequests = 100;
+        // Set request size.
+        const requestSize = 1048576 * 5; // 2 MM
 
-            // Get number of chunks required and size of each chunk.
-            let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
-                chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
-                i = 0,
-                start, end,
-                entireBlob = new Blob( [], { type: 'application/octet-stream' } );
+        // Get number of chunks required and size of each chunk.
+        let numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+            entireBlob = new Blob( [], { type: 'application/octet-stream' } ),
+            theRanges  = [],
+            i          = 0,
+            start, end;
 
-            // Limit the maximum number of requests, we don't want to inadvertently DDOS Youtube.
-            if ( numChunks > maxRequests ){
-                numChunks = maxRequests;
-                // Work out chunkSize again.
-                chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
-            }
-
-            // Loop through the number of chunks required.
-            for( ; i < numChunks; i++ ){
-                // Work out the start and end range in bytes for our chunk request.
-                start = ( chunkSize + 1 ) * i;
-                end   = start + chunkSize;
-
-                // Create an array of promise requests for our Promise.all request.
-                let blob = await new Promise( async ( resolv ) => {
-                    // Make our request and return a blob.
-                    const response       = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET' } ),
-                          aBlob          = await response.blob(),
-                          // Progress updates.
-                          currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
-                          newPercent     = Number( ((i + 1) / numChunks) * 100 ).toFixed( 2 );
-
-                    // Display some basic percentage progress.
-                    calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
-                    resolv( aBlob );
-                });
-                entireBlob = new Blob( [entireBlob, blob], { type: 'application/octet-stream' } );
-            }
-
-            const // Create a URL object with our returned blob data.
-                  urlObject = window.URL.createObjectURL( entireBlob ),
-                  // Create a link element and set it's URL to our URL object.
-                  a = document.createElement( 'a' );
-
-            // Add our link to the page.
-            document.body.appendChild( a );
-            a.href = urlObject;
-            // Set the filename.
-            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
-            // Click the link! Should cause it to download if all has worked well.
-            a.click();
-            // This element is no longer required.
-            a.remove();
-            // Our URL object is no longer required.
-            window.URL.revokeObjectURL( urlObject );
-            // Reset the style of the link that was clicked.
-            calledFrom.className = '';
-            calledFrom.innerText = 'Download';
+        // Create an array containing the requests start and end range.
+        // Allows us to easily remake requests should they fail.
+        for( ; i < numChunks; i++ ){
+            start = ( chunkSize + 1 ) * i;
+            end   = start + chunkSize;
+            theRanges[ i ] = { id: i, start: start, end: end };
         }
-        catch(e){
-            console.log(e);
-            calledFrom.className = '';
-            calledFrom.innerText = 'Download*';
+
+        i = 0;
+        let controller, signal, timeout, blob;
+        // Loop through all of our requests.
+        for( ; i < theRanges.length; i++ ){
+            async function runMe(){
+                blob = await getChunk( theRanges[ i ].start, theRanges[ i ].end );
+            console.log('1', blob);
+                if (blob === 'Aborted' ){
+                    // setTimeout(() => {
+                        // runMe();
+                    // }, 500);
+                    console.log('need to try agian');
+                }
+                
+                entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
+            }
+            await runMe();
+        }
+
+        const // Create a URL object with our returned blob data.
+              urlObject = window.URL.createObjectURL( entireBlob ),
+              // Create a link element and set it's URL to our URL object.
+              a = document.createElement( 'a' );
+
+        // Add our link to the page.
+        document.body.appendChild( a );
+        a.href = urlObject;
+        // Set the filename.
+        a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+        // Click the link! Should cause it to download if all has worked well.
+        a.click();
+        // This element is no longer required.
+        a.remove();
+        // Our URL object is no longer required.
+        window.URL.revokeObjectURL( urlObject );
+        // Reset the style of the link that was clicked.
+        calledFrom.className = '';
+        calledFrom.innerText = 'Download';
+        
+        async function getChunk( start, end ){
+            return new Promise( async ( resolve, reject ) => {
+                const st = start,
+                      en = end;
+                // Create our experimental abort controllers.
+                controller = new AbortController();
+                signal     = controller.signal;
+                // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
+                timeout = setTimeout( () => {
+                    controller.abort();
+                }, 100);
+
+                let response,
+                    // Progress updates.
+                    currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                    newPercent     = Number( ( ( i + 1 ) / numChunks ) * 100 ).toFixed( 2 );
+                
+                // Make our request and return a blob.
+                response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET', signal } )
+                                 .then( response => {
+                                     clearTimeout( timeout );
+                                     return response.blob();
+                                 })
+                                 .catch( err => {console.log('failed')} );
+
+                if (response === undefined){
+                    // Create our experimental abort controllers.
+                    controller = new AbortController();
+                    signal     = controller.signal;
+                    // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
+                    timeout = setTimeout( () => {
+                        controller.abort();
+                    }, 2000);
+                    console.log('trying again');
+                    // Make our request and return a blob.
+                    response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET', signal } )
+                                 .then( response => {
+                                     // We've made a request.
+                                     clearTimeout( timeout );
+                                     return response.blob();
+                                 } )
+                                 .catch( err => { resolve( 'Aborted' ) } );
+                }
+                // Display some basic percentage progress.
+                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                resolve( response );
+            });
         }
     }
 
