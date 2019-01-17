@@ -317,37 +317,26 @@
 
     async function progressiveDownload( data, details, calledFrom ){
         // Set request size.
-        const requestSize = 1048576 * 1; // 1 MB
+        const requestSize = 1048576 * 1, // 1 MB
+              numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
+              chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+              theRanges  = [];
 
         // Get number of chunks required and size of each chunk.
-        let numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
-            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
-            entireBlob = new Blob( [], { type: 'application/octet-stream' } ),
-            theRanges  = [],
+        let entireBlob = new Blob( [], { type: 'application/octet-stream' } ),
             i          = 0,
-            start, end;
+            blob, response, start, end, currentPercent, newPercent;
 
-        // Create an array containing the requests start and end range.
-        // Allows us to easily remake requests should they fail.
-        for( ; i < numChunks; i++ ){
-            start = ( chunkSize + 1 ) * i;
-            end   = start + chunkSize;
-            theRanges[ i ] = { id: i, start: start, end: end };
-        }
-
-        i = 0;
-        let controller, signal, timeout, blob, response;
         // Loop through all of our requests.
-        for( ; i < theRanges.length; i++ ){
-            console.log('getchunk');
-            response = await getChunk( theRanges[ i ].start, theRanges[ i ].end );
-            blob = await response.blob();
-            console.log(response);
+        for( ; i < numChunks; i++ ){
+            start      = ( chunkSize + 1 ) * i;
+            end        = start + chunkSize;
+            response   = await getChunk( start, end );
+            blob       = await response.blob();
             entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
-            
             // Progress updates.
-            let currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
-                newPercent     = Number( ( ( i + 1 ) / numChunks ) * 100 ).toFixed( 2 );
+            currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] );
+            newPercent     = Number( ( ( i + 1 ) / numChunks ) * 100 ).toFixed( 2 );
             calledFrom.innerText = `Downloading ${newPercent}%`;
         }
 
