@@ -198,18 +198,26 @@
                 adaptiveVideo.push( adaptive[ i ] );
             }
         }
-        // Sorts the "adaptiveAudio" array by content length (filesize)
-        adaptiveAudio.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
-        });
-        // Sorts the "adaptiveVideo" array by content length (filesize)
-        adaptiveVideo.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
-        });
-        // Sorts the "formats" array by content length (filesize)
-        formats.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
-        });
+
+        // Sorts the "formats", "adaptiveVideo" and "adaptiveAudio" arrays by their content length (filesize) and their mimetype.
+        simpleSort( formats );
+        simpleSort( adaptiveVideo );
+        simpleSort( adaptiveAudio );
+        
+        function simpleSort( anArray ){
+            // Sorts the "formats" array by content length (filesize)
+            anArray.sort(( a, b ) => {
+                return parseInt( b.contentLength ) - parseInt( a.contentLength );
+            });
+            // Sort by mimetype.
+            anArray.sort(( a, b ) => {
+                let am = a.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ],
+                    bm = b.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ];
+                if ( am < bm )return -1;
+                if ( am > bm )return 1;
+                return  0;
+            });
+        }
 
         /*
             Loop through the previously made, now sorted arrays and display the required information.
@@ -264,7 +272,8 @@
         const row  = document.createElement( 'div' ),
               size = Number( data[ 'contentLength' ] / 1024 / 1024 ).toFixed(2);
 
-        let qual = data[ 'qualityLabel' ];
+        let qual = data[ 'qualityLabel' ],
+            type = data[ 'mimeType' ].split( ';' )[ 0 ].split( '/' )[ 1 ];
 
         /*
             Check if the size is a number!
@@ -282,7 +291,7 @@
 
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
-                         <div class="center">${qual}</div>
+                         <div class="center">${qual} - ${type}</div>
                          <div class="left"><a class="falseLink" href="${ data[ 'url' ] }">Download</a></div>`;
 
         // Create "link" for downloading.
@@ -308,7 +317,7 @@
 
     async function progressiveDownload( data, details, calledFrom ){
         // Set request size.
-        const requestSize = 1048576 * 5; // 2 MM
+        const requestSize = 1048576 * 0.5; // 2 MM
 
         // Get number of chunks required and size of each chunk.
         let numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
@@ -375,7 +384,7 @@
                 // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
                 timeout = setTimeout( () => {
                     controller.abort();
-                }, 100);
+                }, 2000);
 
                 let response,
                     // Progress updates.
