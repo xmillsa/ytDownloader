@@ -317,7 +317,7 @@
 
     async function progressiveDownload( data, details, calledFrom ){
         // Set request size.
-        const requestSize = 1048576 * 0.5; // 2 MM
+        const requestSize = 1048576 * 1; // 1 MB
 
         // Get number of chunks required and size of each chunk.
         let numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
@@ -336,22 +336,19 @@
         }
 
         i = 0;
-        let controller, signal, timeout, blob;
+        let controller, signal, timeout, blob, response;
         // Loop through all of our requests.
         for( ; i < theRanges.length; i++ ){
-            async function runMe(){
-                blob = await getChunk( theRanges[ i ].start, theRanges[ i ].end );
-            console.log('1', blob);
-                if (blob === 'Aborted' ){
-                    // setTimeout(() => {
-                        // runMe();
-                    // }, 500);
-                    console.log('need to try agian');
-                }
-                
-                entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
-            }
-            await runMe();
+            console.log('getchunk');
+            response = await getChunk( theRanges[ i ].start, theRanges[ i ].end );
+            blob = await response.blob();
+            console.log(response);
+            entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
+            
+            // Progress updates.
+            let currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
+                newPercent     = Number( ( ( i + 1 ) / numChunks ) * 100 ).toFixed( 2 );
+            calledFrom.innerText = `Downloading ${newPercent}%`;
         }
 
         const // Create a URL object with our returned blob data.
@@ -373,54 +370,36 @@
         // Reset the style of the link that was clicked.
         calledFrom.className = '';
         calledFrom.innerText = 'Download';
-        
+
         async function getChunk( start, end ){
-            return new Promise( async ( resolve, reject ) => {
-                const st = start,
-                      en = end;
-                // Create our experimental abort controllers.
-                controller = new AbortController();
-                signal     = controller.signal;
-                // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
-                timeout = setTimeout( () => {
-                    controller.abort();
-                }, 2000);
-
-                let response,
-                    // Progress updates.
-                    currentPercent = Number( /[0-9]+(\.[0-9]+)?/.exec( calledFrom.innerText )[ 0 ] ),
-                    newPercent     = Number( ( ( i + 1 ) / numChunks ) * 100 ).toFixed( 2 );
-                
+            return new Promise( async ( resolve ) => {
+                let response;
                 // Make our request and return a blob.
-                response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET', signal } )
-                                 .then( response => {
-                                     clearTimeout( timeout );
-                                     return response.blob();
-                                 })
-                                 .catch( err => {console.log('failed')} );
-
-                if (response === undefined){
-                    // Create our experimental abort controllers.
-                    controller = new AbortController();
-                    signal     = controller.signal;
-                    // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
-                    timeout = setTimeout( () => {
-                        controller.abort();
-                    }, 2000);
-                    console.log('trying again');
-                    // Make our request and return a blob.
-                    response = await fetch( `${data[ 'url' ]}&range=${start}-${end}`, { method: 'GET', signal } )
-                                 .then( response => {
-                                     // We've made a request.
-                                     clearTimeout( timeout );
-                                     return response.blob();
-                                 } )
-                                 .catch( err => { resolve( 'Aborted' ) } );
-                }
-                // Display some basic percentage progress.
-                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                response = await fetchRetry( `${data[ 'url' ]}&range=${start}-${end}`, '', 3 );
                 resolve( response );
             });
+        }
+    }
+
+    async function fetchRetry( url, options, retries ){
+        // Create our experimental abort controllers.
+        const controller = new AbortController(),
+              signal     = controller.signal,
+              // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
+              abortTimer = setTimeout( () => {
+                  controller.abort();
+              }, 1200 );
+              console.log('init');
+        try{
+            return await fetch( url, { method: 'GET', signal } ).then( response => {
+                clearTimeout( abortTimer );
+                console.log('retrying');
+                return response;
+            } );
+        }
+        catch( e ){
+            if ( retries === 1 ) throw e;
+            return await fetchRetry( url, '', retries - 1 );
         }
     }
 
