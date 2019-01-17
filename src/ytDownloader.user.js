@@ -61,7 +61,7 @@
                       data    = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
                                       .then( response => response.text() ),
                       // Parse the data so we can use it.
-                      json     = parseData( data );
+                      json    = parseData( data );
 
                 // Create the links.
                 createLinks( json );
@@ -203,7 +203,7 @@
         simpleSort( formats );
         simpleSort( adaptiveVideo );
         simpleSort( adaptiveAudio );
-        
+
         function simpleSort( anArray ){
             // Sorts the "formats" array by content length (filesize)
             anArray.sort(( a, b ) => {
@@ -222,32 +222,20 @@
         /*
             Loop through the previously made, now sorted arrays and display the required information.
         */
-        i = 0;
-        target = await findTheTarget( '#yt-container #combined' );
-        for( ; i < formats.length; i++ ){
-            if ( row = displayInfo( formats[ i ], details ) ){
-                target.appendChild( row );
-            }
-        }
-        openCloseTrick();
+        displayInformation( '#yt-container #combined', formats );
+        displayInformation( '#yt-container #seperate-audio', adaptiveAudio );
+        displayInformation( '#yt-container #seperate-video', adaptiveVideo );
 
-        i = 0;
-        target = await findTheTarget( '#yt-container #seperate-audio' );
-        for( ; i < adaptiveAudio.length; i++ ){
-            if ( row = displayInfo( adaptiveAudio[ i ], details ) ){
-                target.appendChild( row );
+        async function displayInformation( query, array ){
+            let i = 0;
+            target = await findTheTarget( query );
+            for( ; i < array.length; i++ ){
+                if ( row = displayInfo( array[ i ], details ) ){
+                    target.appendChild( row );
+                }
             }
+            openCloseTrick();
         }
-        openCloseTrick();
-
-        i = 0;
-        target = await findTheTarget( '#yt-container #seperate-video' );
-        for( ; i < adaptiveVideo.length; i++ ){
-            if ( row = displayInfo( adaptiveVideo[ i ], details ) ){
-                target.appendChild( row );
-            }
-        }
-        openCloseTrick();
     }
 
     /*
@@ -317,10 +305,9 @@
 
     async function progressiveDownload( data, details, calledFrom ){
         // Set request size.
-        const requestSize = 1048576 * 1, // 1 MB
-              numChunks  = Math.ceil( data[ 'contentLength' ] / requestSize ),
-              chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
-              theRanges  = [];
+        const requestSize = 1048576 * 2, // 1 MB
+              numChunks   = Math.ceil( data[ 'contentLength' ] / requestSize ),
+              chunkSize   = Math.ceil( data[ 'contentLength' ] / numChunks );
 
         // Get number of chunks required and size of each chunk.
         let entireBlob = new Blob( [], { type: 'application/octet-stream' } ),
@@ -329,9 +316,7 @@
 
         // Loop through all of our requests.
         for( ; i < numChunks; i++ ){
-            start      = ( chunkSize + 1 ) * i;
-            end        = start + chunkSize;
-            response   = await getChunk( start, end );
+            response   = await fetchRetry( `${data[ 'url' ]}&range=${start}-${end}`, '', 3 );
             blob       = await response.blob();
             entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
             // Progress updates.
@@ -359,15 +344,6 @@
         // Reset the style of the link that was clicked.
         calledFrom.className = '';
         calledFrom.innerText = 'Download';
-
-        async function getChunk( start, end ){
-            return new Promise( async ( resolve ) => {
-                let response;
-                // Make our request and return a blob.
-                response = await fetchRetry( `${data[ 'url' ]}&range=${start}-${end}`, '', 3 );
-                resolve( response );
-            });
-        }
     }
 
     async function fetchRetry( url, options, retries ){
@@ -378,7 +354,6 @@
               abortTimer = setTimeout( () => {
                   controller.abort();
               }, 1200 );
-              console.log('init');
         try{
             return await fetch( url, { method: 'GET', signal } ).then( response => {
                 clearTimeout( abortTimer );
