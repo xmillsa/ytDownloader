@@ -15,7 +15,7 @@
     "use strict";
 
     let currURL = window.location.href,
-        prevURL = '';
+        prevURL, t1, t2;
 
     // Always check the URL for changes.
     setInterval( checkURL, 250 );
@@ -316,7 +316,7 @@
 
         // Loop through all of our requests.
         for( ; i < numChunks; i++ ){
-            response   = await fetchRetry( `${data[ 'url' ]}&range=${start}-${end}`, '', 3 );
+            response   = await fetchRetry( `${data[ 'url' ]}&range=${( chunkSize + 1 ) * i}-${( chunkSize + 1 ) * i + chunkSize}`, '', 3 );
             blob       = await response.blob();
             entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
             // Progress updates.
@@ -347,22 +347,27 @@
     }
 
     async function fetchRetry( url, options, retries ){
-        // Create our experimental abort controllers.
-        const controller = new AbortController(),
+        try{
+            // Create our experimental abort controllers.
+            let controller = new AbortController(),
               signal     = controller.signal,
               // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
               abortTimer = setTimeout( () => {
                   controller.abort();
-              }, 1200 );
-        try{
+                  console.log('timed out');
+              }, 500 );
             return await fetch( url, { method: 'GET', signal } ).then( response => {
                 clearTimeout( abortTimer );
-                console.log('retrying');
                 return response;
             } );
         }
         catch( e ){
-            if ( retries === 1 ) throw e;
+            if ( retries === 1 ){
+                throw e;
+                console.log('error', e);
+            }
+            console.log('retrying', e);
+            clearTimeout( abortTimer );
             return await fetchRetry( url, '', retries - 1 );
         }
     }
