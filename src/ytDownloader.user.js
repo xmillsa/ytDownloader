@@ -7,7 +7,7 @@
 // @author      Andy Mills
 // @description A simple script to enable in browser downloading of Youtube videos, no external scripts required.
 // @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
-// @grant       none
+// @grant       GM_xmlhttpRequest
 // @match       https://www.youtube.com/*
 // ==/UserScript==
 
@@ -58,11 +58,11 @@
 
                 // Get the current video ID from the URL.
                 const videoID = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
-                      data    = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
-                                      .then( response => response.text() ),
+                      data    = await xhrFetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
+                                .then( response => response.text() ),
                       // Parse the data so we can use it.
                       json    = parseData( data );
-
+console.log(json);
                 // Create the links.
                 createLinks( json );
             } else {
@@ -99,7 +99,7 @@
     async function createContainer(){
         // Check it's not already been created.
         if ( document.getElementById( 'yt-container' ) === null ){
-            const target  = await findTheTarget( '#primary #player' ),
+            const target  = await Promise.race([ findTheTarget( '#primary #player' ), findTheTarget( '#watch7-user-header' ) ]),
                   div     = document.createElement( 'div' );
 
             // Set the div's attributes.
@@ -292,15 +292,82 @@
             e.preventDefault();
             // Show an indication that the download has started in the background.
             e.target.className = 'inProgress';
-            e.target.innerText = 'Downloading 0%';
+            e.target.innerText = 'Progress 0%';
 
+            // The old method of download, still works and still usable, may allow options in future to choose method.
             //asyncDownload( data, details, e.target );
 
             // Try a new way of downloading...
             progressiveDownload( data, details, e.target );
         });
-
         return row;
+    }
+
+    let controller;
+    const fetchRetry = async ( url, options, retries ) => {
+        try{
+            // Create our experimental abort controllers.
+            controller = new AbortController();
+            const signal = controller.signal;
+              // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
+            let abortTimer = setTimeout( () => {
+                  controller.abort();
+              }, 2000 );
+            return await xhrFetch( url, { method: 'GET', mode: 'cors', signal } ).then( response => {
+                clearTimeout( abortTimer );
+                return response;
+            } );
+        }
+        catch( e ){
+            if ( retries <= 1 ){
+                throw e;
+            }
+            return await fetchRetry( url, '', retries - 1 );
+        }
+    };
+    
+    /*
+        The Fetch API doesn't seem to work very well in TamperMonkey or ViolentMonkey (CORS issue), let's use the old fashioned way.
+        Turn XMLHttpRequest into a promise with .text() and blob() functions, just like fetch!
+    */
+    function xhrFetch( url, options ){
+        return new Promise( ( resolve, reject ) => {
+            
+            GM_xmlhttpRequest( {
+                method: options.method,
+                url: url,
+                onload: ( response ) => {
+                    resolve( process( response ) );
+                }
+            });
+
+            function process( response ){
+                return {
+                    text: () => Promise.resolve( response.responseText ),
+                    blob: () => Promise.resolve( new Blob( [ response.responseText ] ) )
+                };
+            }
+        });
+    }
+    
+    function xhrFetch_old( url, options ){
+        return new Promise( ( resolve, reject ) => {
+            const request = new XMLHttpRequest();
+
+            request.onload = () => {
+                resolve( response() );
+            }
+
+            function response(){
+                return {
+                    text: () => Promise.resolve( request.responseText ),
+                    blob: () => Promise.resolve( new Blob( [ request.response ] ) )
+                };
+            }
+            request.open( options.method, url, true );
+            
+            request.send('');
+        });
     }
 
     async function progressiveDownload( data, details, calledFrom ){
@@ -312,11 +379,23 @@
         // Get number of chunks required and size of each chunk.
         let entireBlob = new Blob( [], { type: 'application/octet-stream' } ),
             i          = 0,
-            blob, response, start, end, currentPercent, newPercent;
+            blob, response, currentPercent, newPercent, start, end;
 
         // Loop through all of our requests.
         for( ; i < numChunks; i++ ){
-            response   = await fetchRetry( `${data[ 'url' ]}&range=${( chunkSize + 1 ) * i}-${( chunkSize + 1 ) * i + chunkSize}`, '', 3 );
+            try{
+                // Work out start and end of range.
+                start = ( chunkSize + 1 ) * i;
+                end = start + chunkSize;
+                // Make a request and await the chunk of data.
+                response   = await fetchRetry( `${data[ 'url' ]}&range=${start}-${end}`, '', 3 );
+            }
+            catch(e){
+                calledFrom.className = '';
+                calledFrom.innerText = 'Failed';
+                return;
+            }
+            //console.log(response);
             blob       = await response.blob();
             entireBlob = new Blob( [ entireBlob, blob ], { type: 'application/octet-stream' } );
             // Progress updates.
@@ -344,32 +423,6 @@
         // Reset the style of the link that was clicked.
         calledFrom.className = '';
         calledFrom.innerText = 'Download';
-    }
-
-    async function fetchRetry( url, options, retries ){
-        try{
-            // Create our experimental abort controllers.
-            let controller = new AbortController(),
-              signal     = controller.signal,
-              // Timeout to run if the fetch API hasn't got a response yet, aborts the fetch.
-              abortTimer = setTimeout( () => {
-                  controller.abort();
-                  console.log('timed out');
-              }, 500 );
-            return await fetch( url, { method: 'GET', signal } ).then( response => {
-                clearTimeout( abortTimer );
-                return response;
-            } );
-        }
-        catch( e ){
-            if ( retries === 1 ){
-                throw e;
-                console.log('error', e);
-            }
-            console.log('retrying', e);
-            clearTimeout( abortTimer );
-            return await fetchRetry( url, '', retries - 1 );
-        }
     }
 
     /*
@@ -412,7 +465,7 @@
                       newPercent     = Number( currentPercent + ( ( 100 / numChunks ) ) ).toFixed( 2 );
 
                 // Display some basic percentage progress.
-                calledFrom.innerText = 'Downloading '+ String( newPercent ) +'%';
+                calledFrom.innerText = 'Progress '+ String( newPercent ) +'%';
                 resolv( aBlob );
             }));
         }
@@ -461,7 +514,7 @@
         if (document.getElementById( 'yt-downloader-styles' ) === null ){
             const css = `
                   #yt-container *{box-sizing:border-box}
-                  #yt-container{color:var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:1.3em;height:20px;line-height:1.22em;margin:.3em 0 1px 0;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
+                  #yt-container{color:#444,var(--ytd-video-primary-info-renderer-title-color,var(--yt-spec-text-primary));font-size:13px;height:20px;line-height:1.22em;margin:.3em 0 1px 0;min-height:20px;overflow:hidden;position:relative;transition:height .4s}
                   #yt-container > button{background-color:transparent;border:none;color:var(--yt-spec-text-secondary);cursor:pointer;height:18px;margin:0;padding:0;position:relative;transition:box-shadow .2s;user-select:none;width:100%;z-index:1}
                   #yt-container > button::before{content:'<';left:5px;position:absolute;transform:rotate(-90deg);transition:transform .4s}
                   #yt-container > button::after{content:'>';position:absolute;right:5px;transform:rotate(90deg);transition:transform .4s}
@@ -484,7 +537,7 @@
                   #yt-links .inProgress{color:var(--yt-expand-color);font-size:.9em;pointer-events:none;text-decoration:none}
                   #yt-links .footer{background-color:var(--yt-playlist-background-item);font-size:.86em;padding:0}
                   ytd-video-primary-info-renderer{padding-top:10px}
-                  `,
+                  `.replace(/\s\s+/g,''),
                   style = document.createElement( 'style' );
 
             style.id = 'yt-downloader-styles';
