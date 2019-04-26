@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.2.2
+// @version     0.2.3
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -58,7 +58,7 @@
 
                 // Get the current video ID from the URL.
                 const videoID  = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
-                      response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } ),
+                      response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage&pl=default`, { method: 'GET' } ),
                       data     = await response.text(),
                       // Parse the data so we can use it.
                       json     = parseData( data );
@@ -84,8 +84,44 @@
     */
     function parseData( data ){
         const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
-              json     = JSON.parse(decodeURIComponent( captured ) );
+              adaptive = /(?:adaptive_fmts=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
+              fmts     = /(?:rvs=)(.*?)(?:&|$)/i.exec( data )[ 1 ];
 
+        let arr = decodeURIComponent( adaptive ).split(','),
+            mainObj = [];
+        let i = 0;
+        arr.forEach( el => {
+          let arr2 = el.split('&');
+          let arr3 = {};
+          arr2.forEach( el2 => {
+            let arr4 = el2.split('=');
+            arr3[ arr4[ 0 ] ] = arr4[ 1 ];
+          } );
+          mainObj[ i ] = arr3;
+          i++;
+        } );
+      
+        i = 0;
+        let brr = decodeURIComponent( fmts ).split( ',' ),
+            fmtArray = [];
+        brr.forEach( el => {
+          let brr2 = el.split('&');
+          let brr3 = {};
+          brr2.forEach( el2 => {
+            let brr4 = el2.split('=');
+            brr3[ brr4[ 0 ] ] = brr4[ 1 ];
+          } );
+          fmtArray[ i ] = brr3;
+          i++;
+        } );
+        
+        let mainArray = [];
+        
+        mainArray[ 'formats' ] = fmtArray;
+        mainArray[ 'adaptiveFormats' ] = mainObj;
+      
+        const json = mainArray;
+      
         return json;
     }
 
@@ -179,9 +215,9 @@
         // Store video details.
         const details       = json.videoDetails,
               // Store the combined video formats.
-              formats       = json.streamingData.formats,
+              formats       = json.formats,
               // Store the seperate video & audio formats.
-              adaptive      = json.streamingData.adaptiveFormats,
+              adaptive      = json.adaptiveFormats,
               // Store Video only.
               adaptiveVideo = [],
               // Store Audio only.
@@ -190,7 +226,7 @@
         let row, target, i = 0;
         // Loops through the adaptive array and stores the audio and video links seperately.
         for( ; i < adaptive.length; i++ ){
-            if ( adaptive[ i ].mimeType.split( ';' )[ 0 ].split( '/' )[ 0 ] === 'audio' ){
+            if ( adaptive[ i ].audio_channels !== undefined ){
                 // Send to Audio only array.
                 adaptiveAudio.push( adaptive[ i ] );
             } else {
@@ -198,17 +234,18 @@
                 adaptiveVideo.push( adaptive[ i ] );
             }
         }
+
         // Sorts the "adaptiveAudio" array by content length (filesize)
         adaptiveAudio.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
+            return parseInt( b.clen ) - parseInt( a.clen );
         });
         // Sorts the "adaptiveVideo" array by content length (filesize)
         adaptiveVideo.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
+            return parseInt( b.clen ) - parseInt( a.clen );
         });
         // Sorts the "formats" array by content length (filesize)
         formats.sort(( a, b ) => {
-            return parseInt( b.contentLength ) - parseInt( a.contentLength );
+            return parseInt( b.clen ) - parseInt( a.clen );
         });
 
         /*
@@ -262,9 +299,9 @@
     */
     function displayInfo( data, details ){
         const row  = document.createElement( 'div' ),
-              size = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
+              size = Number(data[ 'clen' ] / 1024 / 1024).toFixed(2);
 
-        let qual = data[ 'qualityLabel' ];
+        let qual = data[ 'quality_label' ];
 
         /*
             Check if the size is a number!
@@ -277,7 +314,7 @@
 
         // Convert to Kbs for easier reading. (audio only)
         if ( qual === undefined ){
-            qual = String( Number(data[ 'averageBitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
+            qual = String( Number(data[ 'bitrate' ] / 1024 ).toFixed( 0 ) ) +' Kbs';
         }
 
         row.className = 'row';
@@ -316,8 +353,8 @@
               maxRequests = 16;
 
         // Get number of chunks required and size of each chunk.
-        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
-            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
+        let numChunks = Math.ceil( data[ 'clen' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'clen' ] / numChunks ),
             i = 0,
             start, end;
 
@@ -325,7 +362,7 @@
         if ( numChunks > maxRequests ){
             numChunks = maxRequests;
             // Work out chunkSize again.
-            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
+            chunkSize = Math.ceil( data[ 'clen' ] / numChunks );
         }
 
         // Loop through the number of chunks required.
