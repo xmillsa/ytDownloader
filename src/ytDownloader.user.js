@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Xmillsa's Youtube Downloader
-// @version     0.2.3
+// @version     0.2.4
 // @namespace   https://andys-net.co.uk/
 // @homepageURL https://andys-net.co.uk/
 // @license     GPL-3.0-or-later; https://spdx.org/licenses/GPL-3.0-or-later.html
@@ -119,7 +119,8 @@
         
         mainArray[ 'formats' ] = fmtArray;
         mainArray[ 'adaptiveFormats' ] = mainObj;
-      
+        mainArray[ 'videoDetails' ] = JSON.parse( decodeURIComponent( captured ) ).videoDetails;
+
         const json = mainArray;
       
         return json;
@@ -141,7 +142,7 @@
             // Set the div's attributes.
             div.id        = 'yt-container';
             div.className = 'style-scope ytd-watch-flexy';
-            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><div><h3>Video & Audio Combined</h3><div id="combined"></div></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div><div class="center footer flex"><div>Left Click = Potentially Quicker Download</div><div>Right Click -> Save As = Normal Download</div></div>';
+            div.innerHTML = '<button id="linksButton">Download Links</button><div id="yt-links"><div><div><h3>Video & Audio Combined</h3><div id="combined"></div></div></div><div class="flex"><div><h3>Video Only - No Audio</h3><div id="seperate-video"></div></div><div><h3>Audio Only - No Video</h3><div id="seperate-audio"></div></div></div><div class="center footer flex"><div><s>Left Click = Potentially Quicker Download</s></div><div>Right Click -> Save As = Normal Download</div></div>';
 
             div.getElementsByTagName( 'button' )[ 0 ].addEventListener( 'click', () => {
                 // Do some magic to allow for a variable number of links. (overall container height)
@@ -320,7 +321,7 @@
         row.className = 'row';
         row.innerHTML = `<div class="right">${size} MB</div>
                          <div class="center">${qual}</div>
-                         <div class="left"><a class="falseLink" href="${ data[ 'url' ] }">Download</a></div>`;
+                         <div class="left"><a class="falseLink" href="${ decodeURIComponent(data[ 'url' ]) }">Download</a></div>`;
 
         // Create "link" for downloading.
         let a = document.createElement( 'a' );
@@ -328,14 +329,14 @@
         a.className = 'falseLink';
 
         // Listen to clicks, once clicked start the download process.
-        row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
+        /*row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
             e.preventDefault();
             // Show an indication that the download has started in the background.
             e.target.className = 'inProgress';
             e.target.innerText = 'Downloading 0%';
             
             asyncDownload( data, details, e.target );
-        });
+        });*/
 
         return row;
     }
@@ -399,7 +400,8 @@
             document.body.appendChild( a );
             a.href = urlObject;
             // Set the filename.
-            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.mimeType.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
+            console.log( data );
+            a.download = `${details[ 'title' ].replace(/\+/g,' ')}.${data.type.split( ';' )[ 0 ].split( '/' )[ 1 ]}`;
             // Click the link! Should cause it to download if all has worked well.
             a.click();
             // This element is no longer required.
