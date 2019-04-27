@@ -7,7 +7,7 @@
 // @author      Andy Mills
 // @description A simple script to enable in browser downloading of Youtube videos, no external scripts required.
 // @icon        https://github.com/xmillsa/ytDownloader/raw/master/ytD-icon.png
-// @grant       GM_xmlhttpRequest
+// @grant       none
 // @match       https://www.youtube.com/*
 // ==/UserScript==
 
@@ -58,7 +58,7 @@
 
                 // Get the current video ID from the URL.
                 const videoID = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
-                      data    = await xhrFetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
+                      data    = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage`, { method: 'GET' } )
                                 .then( response => response.text() ),
                       // Parse the data so we can use it.
                       json    = parseData( data );
@@ -83,9 +83,11 @@ console.log(json);
         We only require the "player_response" section, once found, turn it into JSON for easy use.
     */
     function parseData( data ){
+        //const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
+        //      json     = JSON.parse(decodeURIComponent( captured ) );
         const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
               json     = JSON.parse(decodeURIComponent( captured ) );
-
+        console.log( data );
         return json;
     }
 
@@ -313,7 +315,7 @@ console.log(json);
             let abortTimer = setTimeout( () => {
                   controller.abort();
               }, 2000 );
-            return await xhrFetch( url, { method: 'GET', mode: 'cors', signal } ).then( response => {
+            return await fetch( url, { method: 'GET', mode: 'cors', signal } ).then( response => {
                 clearTimeout( abortTimer );
                 return response;
             } );
@@ -333,7 +335,7 @@ console.log(json);
     function xhrFetch( url, options ){
         return new Promise( ( resolve, reject ) => {
             
-            GM_xmlhttpRequest( {
+            /*GM.xmlhttpRequest( {
                 method: options.method,
                 url: url,
                 onload: ( response ) => {
@@ -346,7 +348,7 @@ console.log(json);
                     text: () => Promise.resolve( response.responseText ),
                     blob: () => Promise.resolve( new Blob( [ response.responseText ] ) )
                 };
-            }
+            }*/
         });
     }
     
