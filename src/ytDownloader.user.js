@@ -35,6 +35,11 @@
         }
     }
 
+    function decodeHTML(input) {
+        var doc = new DOMParser().parseFromString(input, "text/html");
+        return doc.documentElement.textContent;
+    }
+
     /*
         The main function, everything is done through this function.
         First we check if we're on the correct page,
@@ -58,10 +63,15 @@
 
                 // Get the current video ID from the URL.
                 const videoID  = /(?:\?v=)(.*?)(?:&|$)/i.exec(window.location.search)[1],
-                      response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage&pl=default`, { method: 'GET' } ),
+                      response = await fetch( `https://www.youtube.com/get_video_info?video_id=${videoID}&el=detailpage&pl=default&html5=1`, {
+                          method: 'GET',
+                          headers: new Headers({
+                              'Cookie': 'CONSENT=YES+cb'
+                          }),
+                      } ),
                       data     = await response.text(),
                       // Parse the data so we can use it.
-                      json     = parseData( data );
+                      json     = parseData( decodeURIComponent(data) );
 
                 // Create the links.
                 createLinks( json );
@@ -83,43 +93,14 @@
         We only require the "player_response" section, once found, turn it into JSON for easy use.
     */
     function parseData( data ){
-        const captured = /(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
-              adaptive = /(?:adaptive_fmts=)(.*?)(?:&|$)/i.exec( data )[ 1 ],
+        const captured = decodeURIComponent(/(?:player_response=)(.*?)(?:&|$)/i.exec( data )[ 1 ]),
               fmts     = /(?:rvs=)(.*?)(?:&|$)/i.exec( data )[ 1 ];
 
-        let arr = decodeURIComponent( adaptive ).split(','),
-            mainObj = [];
-        let i = 0;
-        arr.forEach( el => {
-          let arr2 = el.split('&');
-          let arr3 = {};
-          arr2.forEach( el2 => {
-            let arr4 = el2.split('=');
-            arr3[ arr4[ 0 ] ] = arr4[ 1 ];
-          } );
-          mainObj[ i ] = arr3;
-          i++;
-        } );
-      
-        i = 0;
-        let brr = decodeURIComponent( fmts ).split( ',' ),
-            fmtArray = [];
-        brr.forEach( el => {
-          let brr2 = el.split('&');
-          let brr3 = {};
-          brr2.forEach( el2 => {
-            let brr4 = el2.split('=');
-            brr3[ brr4[ 0 ] ] = brr4[ 1 ];
-          } );
-          fmtArray[ i ] = brr3;
-          i++;
-        } );
-        
         let mainArray = [];
-        
-        mainArray[ 'formats' ] = fmtArray;
-        mainArray[ 'adaptiveFormats' ] = mainObj;
-        mainArray[ 'videoDetails' ] = JSON.parse( decodeURIComponent( captured ) ).videoDetails;
+
+        mainArray[ 'formats' ] = JSON.parse(captured).streamingData.formats;
+        mainArray[ 'adaptiveFormats' ] = JSON.parse(captured).streamingData.adaptiveFormats;
+        mainArray[ 'videoDetails' ] = JSON.parse(captured).videoDetails;
 
         const json = mainArray;
       
@@ -227,7 +208,7 @@
         let row, target, i = 0;
         // Loops through the adaptive array and stores the audio and video links seperately.
         for( ; i < adaptive.length; i++ ){
-            if ( adaptive[ i ].audio_channels !== undefined ){
+            if ( adaptive[ i ].audioChannels !== undefined ){
                 // Send to Audio only array.
                 adaptiveAudio.push( adaptive[ i ] );
             } else {
@@ -238,15 +219,15 @@
 
         // Sorts the "adaptiveAudio" array by content length (filesize)
         adaptiveAudio.sort(( a, b ) => {
-            return parseInt( b.clen ) - parseInt( a.clen );
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
         // Sorts the "adaptiveVideo" array by content length (filesize)
         adaptiveVideo.sort(( a, b ) => {
-            return parseInt( b.clen ) - parseInt( a.clen );
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
         // Sorts the "formats" array by content length (filesize)
         formats.sort(( a, b ) => {
-            return parseInt( b.clen ) - parseInt( a.clen );
+            return parseInt( b.contentLength ) - parseInt( a.contentLength );
         });
 
         /*
@@ -300,9 +281,9 @@
     */
     function displayInfo( data, details ){
         const row  = document.createElement( 'div' ),
-              size = Number(data[ 'clen' ] / 1024 / 1024).toFixed(2);
+              size = Number(data[ 'contentLength' ] / 1024 / 1024).toFixed(2);
 
-        let qual = data[ 'quality_label' ];
+        let qual = data[ 'qualityLabel' ];
 
         /*
             Check if the size is a number!
@@ -328,16 +309,6 @@
         a.innerText = 'Download';
         a.className = 'falseLink';
 
-        // Listen to clicks, once clicked start the download process.
-        /*row.getElementsByTagName( 'a' )[ 0 ].addEventListener( 'click', ( e ) => {
-            e.preventDefault();
-            // Show an indication that the download has started in the background.
-            e.target.className = 'inProgress';
-            e.target.innerText = 'Downloading 0%';
-            
-            asyncDownload( data, details, e.target );
-        });*/
-
         return row;
     }
 
@@ -354,8 +325,8 @@
               maxRequests = 16;
 
         // Get number of chunks required and size of each chunk.
-        let numChunks = Math.ceil( data[ 'clen' ] / requestSize ),
-            chunkSize  = Math.ceil( data[ 'clen' ] / numChunks ),
+        let numChunks = Math.ceil( data[ 'contentLength' ] / requestSize ),
+            chunkSize  = Math.ceil( data[ 'contentLength' ] / numChunks ),
             i = 0,
             start, end;
 
@@ -363,7 +334,7 @@
         if ( numChunks > maxRequests ){
             numChunks = maxRequests;
             // Work out chunkSize again.
-            chunkSize = Math.ceil( data[ 'clen' ] / numChunks );
+            chunkSize = Math.ceil( data[ 'contentLength' ] / numChunks );
         }
 
         // Loop through the number of chunks required.
